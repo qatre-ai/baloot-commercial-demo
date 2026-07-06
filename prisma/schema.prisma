@@ -1,0 +1,1375 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// مهر آوای بلوط - Database Schema v7.0
+// Production-Ready, AI-Ready, Commercial-Grade
+// Unified User Model + RBAC + Security + Blog System
+// Smart fields, AI-ready analytics, Iran-optimized
+// 3 Registration Methods + Tuition Tracking (NO online payment)
+// Session ranges (exact or range) + Workshop reservations + Admin notifications
+// v7: Extended Instructor Profile, Feedback, Attendance, Website Events, Session Logs, Class IDs
+// ============================================
+
+// ─────────────────────────────────────────────
+// USERS - Unified model for Instructors & Students
+// Structured for AI-driven business analysis
+// ─────────────────────────────────────────────
+
+/// Unified user model - both instructors (اساتید) and students (هنرجویان)
+/// Rich structured data for AI automation and business intelligence
+/// Iran-optimized: phone-centric, no email dependency, Shamsi dates
+model Student {
+  id                      String    @id @default(cuid())
+  email                   String    @unique
+  phone                   String    @default("")       // شماره تماس خود هنرجو - PRIMARY contact in Iran
+  name                    String
+  password                String    // hashed with SHA-256 + salt
+  avatarUrl               String?
+  
+  // ─── User Category ─────────────────────────
+  role                    String    @default("student") // student | instructor
+  
+  // ─── Personal Information ──────────────────
+  dateOfBirth             String?   // ISO date string (store as ISO, display as Shamsi)
+  gender                  String?   // male | female | other | prefer_not_to_say
+  nationalId              String?   // کد ملی - for official records
+  educationLevel          String?   // preschool | primary | middle_school | high_school | diploma | associate | bachelor | master | phd | other
+  fieldOfStudy            String?   // رشته تحصیلی
+  
+  // ─── Music Profile ────────────────────────
+  registrationInstrument  String?   // سازی که با آن ثبت‌نام کرده (مهم برای تحلیل هوشمند)
+  primaryInstrument       String?   // ساز اصلی - piano | guitar | violin | setar | tar | kamancheh | drums | vocals | santur | oud | flute | daf | tonbak | other
+  secondaryInstruments    String?   // JSON array: ["guitar", "piano"] یا "none"
+  musicExperienceYears    Int?      // سال‌های تجربه موسیقی
+  previousTraining        String?   // none | self_taught | private_tutor | music_school | university | online_courses
+  musicGenres             String?   // JSON array: ["classical", "iranian_traditional", "pop", "jazz"]
+  learningGoals           String?   // JSON: هدف از یادگیری - hobby | professional_career | teaching | performance | composition | exam_prep | self_improvement
+  practiceHoursPerWeek    Int?      // ساعت تمرین هفتگی
+  skillLevel              String?   // beginner | intermediate | advanced | professional
+  instructorName          String?   // نام استاد فعلی یا قبلی
+  instructorNameKnown     Boolean   @default(true)  // آیا نام استاد مشخص است؟
+  
+  // ─── Contact & Location ───────────────────
+  address                 String?
+  city                    String?
+  province                String?
+  emergencyContact        String?   // تماس اضطراری
+  
+  // ─── Parent/Guardian (for minors) ─────────
+  parentName              String?
+  parentPhone             String?   // شماره تماس ولی (جایگزین ایمیل - در ایران کاربردی‌تر)
+  parentRelation          String?   // father | mother | guardian | other
+  
+  // ─── Business Intelligence ────────────────
+  referralSource          String?   // instagram | telegram | google | friend | billboard | website | event | other
+  referralDetail          String?   // جزئیات منبع ارجاع
+  leadScore               Int       @default(0)     // AI-calculated lead score (0-100)
+  customerLifetimeValue   Int       @default(0)     // کل پرداختی‌ها (تومان)
+  churnRisk               String?   // low | medium | high - AI-predicted churn risk
+  engagementScore         Int       @default(0)     // AI-calculated engagement score (0-100)
+  preferredBranch         String?   // شعبه ترجیحی - for AI scheduling optimization
+  
+  // ─── Instructor-Specific Fields ───────────
+  specialtyFa             String?   // تخصص فارسی
+  specialtyEn             String?   // Specialty in English
+  bioFa                   String?   // بیوگرافی فارسی
+  bioEn                   String?   // Biography in English
+  experience              String?   // سابقه تدریس
+  socialLinks             String?   // JSON: {instagram, telegram, youtube, soundcloud}
+  instructorOrder         Int       @default(0)     // Display order for instructors page
+  isPublishedInstructor   Boolean   @default(false) // Show on instructors page?
+
+  // ─── Instructor Extended Profile (AI-Ready) ─
+  teachingInstruments     String?   // JSON array: سازهایی که تدریس می‌کند - ["piano","guitar"]
+  certifications          String?   // JSON array: مدارک و گواهینامه‌ها - [{title,issuer,year}]
+  hourlyRate              Int?      // حق الساعع به تومان - for AI revenue analysis
+  availableDays           String?   // JSON array: روزهای_available - ["saturday","monday"]
+  availableTimeRanges     String?   // JSON: {saturday: "14:00-20:00", monday: "10:00-18:00"}
+  instructorRating        Float     @default(0)     // میانگین امتیاز از بازخورد هنرجویان (0-5)
+  totalTeachingHours      Int       @default(0)     // کل ساعت تدریس - AI performance metric
+  totalStudentsTaught     Int       @default(0)     // تعداد کل هنرجویان تدریس‌شده - for capacity planning
+  hireDate                String?   // تاریخ استخدام (ISO string, display as Shamsi)
+  contractType            String?   // full_time | part_time | hourly | contract | freelance
+  instructorStatus        String    @default("active")  // active | on_leave | suspended | terminated
+  feedbackSummary         String?   // JSON: AI-generated summary of all feedback - {positive:[], negative:[], score:4.2}
+  performanceScore        Int       @default(0)     // AI-calculated performance score (0-100)
+  
+  // ─── Status & Tracking ────────────────────
+  isActive                Boolean   @default(true)
+  isVerified              Boolean   @default(false)  // Phone verified
+  lastLogin               DateTime?
+  lastLoginIp             String?
+  notes                   String?   // Internal admin notes
+  tags                    String?   // JSON array of admin tags for categorization
+  registrationStatus      String    @default("approved") // pending | approved | rejected
+  
+  // ─── AI Automation Fields ─────────────────
+  aiRecommendations       String?   // JSON: AI-generated course/workshop recommendations
+  aiLastAnalysis          DateTime? // Last time AI analyzed this user
+  aiSegmentTag            String?   // AI-assigned segment: active | at_risk | dormant | new | vip | champion
+  aiChurnFactors          String?   // JSON: AI-identified churn factors
+  aiNextBestAction        String?   // JSON: AI-suggested next action for retention
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // ─── Relations ────────────────────────────
+  tickets                 WorkshopTicket[]
+  blogPosts               BlogPost[]
+  enrollments             CourseEnrollment[]
+  loginSessions           LoginSession[]
+  exercises               StudentExercise[]
+  payments                Payment[]
+  taughtCourses           Course[]              @relation("InstructorCourses")  // Courses this instructor teaches
+  classSchedules          ClassSchedule[]       @relation("InstructorSchedules")  // Scheduled class sessions
+  scheduleChangeRequests  ScheduleChangeRequest[] @relation("InstructorChangeRequests")  // Instructor change requests
+  instructorExercises     Exercise[]           @relation("InstructorExercises")  // Exercises created by this instructor
+  givenFeedback           InstructorFeedback[] @relation("InstructorReceivedFeedback")  // Feedback received by this instructor
+  writtenFeedback         InstructorFeedback[] @relation("StudentWrittenFeedback")  // Feedback written by this student
+  attendances             Attendance[]         // Student attendance records
+
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+  @@index([isActive])
+  @@index([primaryInstrument])
+  @@index([registrationInstrument])
+  @@index([referralSource])
+  @@index([gender])
+  @@index([city])
+  @@index([leadScore])
+  @@index([aiSegmentTag])
+  @@index([instructorNameKnown])
+  @@index([createdAt])
+  @@index([registrationStatus])
+}
+
+// ─────────────────────────────────────────────
+// AUTHENTICATION & AUTHORIZATION
+// ─────────────────────────────────────────────
+
+/// Super Admin & Sub-Admin accounts with full RBAC support
+model Admin {
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  name                  String
+  password              String    // hashed with SHA-256 + salt
+  phone                 String?
+  role                  String    @default("admin")  // super_admin | admin | editor
+  avatarUrl             String?
+  isActive              Boolean   @default(true)
+  twoFactorEnabled      Boolean   @default(false)
+  twoFactorSecret       String?
+  mustChangePassword    Boolean   @default(true)
+  failedLoginAttempts   Int       @default(0)
+  lockedUntil           DateTime?
+  lastLoginAt           DateTime?
+  lastLoginIp           String?
+  createdBy             String?
+  notes                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  permissions           AdminPermission[]
+  auditLogs             AuditLog[]
+  loginSessions         LoginSession[]
+  devices               AdminDevice[]
+  sentMessages          AdminMessage[]       @relation("SentMessages")
+  receivedMessages      AdminMessage[]       @relation("ReceivedMessages")
+  backups               BackupRecord[]
+  intrusionAlerts       IntrusionAlert[]     @relation("TargetAdmin")
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+}
+
+/// Granular resource+action permissions for RBAC
+model AdminPermission {
+  id          String   @id @default(cuid())
+  adminId     String
+  resource    String   // users | courses | workshops | blog | announcements | instructors | branches | media | backups | settings | messages | analytics
+  action      String   // create | read | update | delete | publish | manage | feature
+  granted     Boolean  @default(true)
+  grantedBy   String?
+  createdAt   DateTime @default(now())
+
+  admin       Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@unique([adminId, resource, action])
+  @@index([adminId])
+  @@index([resource])
+}
+
+/// Audit trail for all admin actions
+model AuditLog {
+  id            String   @id @default(cuid())
+  adminId       String?
+  action        String
+  entity        String
+  entityId      String?
+  entityName    String?
+  details       String?  // JSON string with change details
+  ipAddress     String?
+  userAgent     String?
+  severity      String   @default("info")  // info | warning | critical
+  createdAt     DateTime @default(now())
+
+  admin         Admin?   @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([adminId])
+  @@index([entity])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+/// Active and past login sessions
+model LoginSession {
+  id            String    @id @default(cuid())
+  adminId       String?
+  studentId     String?
+  userType      String    // admin | student | instructor
+  sessionToken  String?   @unique
+  ipAddress     String
+  userAgent     String?
+  country       String?
+  city          String?
+  deviceType    String?
+  browser       String?
+  os            String?
+  deviceFingerprint String?
+  isActive      Boolean   @default(true)
+  loginAt       DateTime  @default(now())
+  logoutAt      DateTime?
+  expiresAt     DateTime?
+
+  admin         Admin?    @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  student       Student?  @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@index([adminId])
+  @@index([studentId])
+  @@index([isActive])
+  @@index([ipAddress])
+  @@index([loginAt])
+}
+
+/// Whitelisted devices for admin access control
+model AdminDevice {
+  id              String   @id @default(cuid())
+  adminId         String
+  deviceName      String
+  deviceType      String   // desktop | mobile | tablet
+  browser         String?
+  os              String?
+  deviceFingerprint String?
+  ipAddress       String?
+  isApproved      Boolean  @default(false)
+  lastUsedAt      DateTime?
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  admin           Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([isApproved])
+  @@index([deviceFingerprint])
+}
+
+/// Intrusion detection alerts
+model IntrusionAlert {
+  id              String    @id @default(cuid())
+  targetAdminId   String?
+  attemptType     String    // brute_force | credential_stuffing | suspicious_device | unknown_device | suspicious_ip | rate_limit
+  ipAddress       String
+  userAgent       String?
+  country         String?
+  city            String?
+  deviceFingerprint String?
+  attemptCount    Int       @default(1)
+  details         String?
+  isResolved      Boolean   @default(false)
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  targetAdmin     Admin?    @relation("TargetAdmin", fields: [targetAdminId], references: [id], onDelete: SetNull)
+
+  @@index([targetAdminId])
+  @@index([isResolved])
+  @@index([ipAddress])
+  @@index([createdAt])
+}
+
+/// Internal messaging system between admins
+model AdminMessage {
+  id              String    @id @default(cuid())
+  senderId        String
+  recipientId     String
+  subject         String
+  content         String
+  priority        String    @default("normal")  // low | normal | high | urgent
+  status          String    @default("sent")     // sent | delivered | read | archived
+  parentMessageId String?
+  isSystemMessage Boolean   @default(false)
+  readAt          DateTime?
+  archivedBy      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sender          Admin     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient       Admin     @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([recipientId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([recipientId, status])
+}
+
+/// Backup records - manual and automatic
+model BackupRecord {
+  id              String   @id @default(cuid())
+  performedBy     String?
+  backupType      String   // manual | auto_daily | auto_weekly | before_update
+  fileSize        Int?
+  fileKey         String?
+  checksum        String?
+  checksumAlgorithm String? @default("sha256")
+  encryptionUsed  Boolean  @default(false)
+  status          String   @default("completed")  // in_progress | completed | failed | restoring | verifying
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  admin           Admin?   @relation(fields: [performedBy], references: [id], onDelete: SetNull)
+
+  @@index([performedBy])
+  @@index([backupType])
+  @@index([createdAt])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// PENDING REGISTRATIONS - Online submissions awaiting admin approval
+// When approved, a Student account is created with username=phone, password=nationalId
+// ─────────────────────────────────────────────
+
+/// Online registration submissions that await admin review
+/// All data is preserved for future analysis and process evaluation
+model PendingRegistration {
+  id                      String    @id @default(cuid())
+  
+  // ─── Core Info (Required) ──────────────────
+  name                    String    // نام و نام خانوادگی
+  phone                   String    // شماره موبایل - will become username
+  nationalId              String    // کد ملی - will become default password
+  email                   String?   // ایمیل (optional in Iran)
+  role                    String    @default("student") // student | instructor
+  
+  // ─── Personal Information ──────────────────
+  dateOfBirth             String?   // ISO date string
+  gender                  String?   // male | female | other | prefer_not_to_say
+  educationLevel          String?   // preschool | primary | middle_school | high_school | diploma | associate | bachelor | master | phd | other
+  fieldOfStudy            String?   // رشته تحصیلی
+  
+  // ─── Music Profile ────────────────────────
+  registrationInstrument  String?   // سازی که با آن ثبت‌نام کرده
+  primaryInstrument       String?   // ساز اصلی
+  secondaryInstruments    String?   // JSON array
+  musicExperienceYears    Int?      // سال‌های تجربه موسیقی
+  previousTraining        String?   // none | self_taught | private_tutor | music_school | university | online_courses
+  musicGenres             String?   // JSON array
+  learningGoals           String?   // JSON array
+  practiceHoursPerWeek    Int?      // ساعت تمرین هفتگی
+  skillLevel              String?   // beginner | intermediate | advanced | professional
+  instructorName          String?   // نام استاد فعلی یا قبلی
+  instructorNameKnown     Boolean   @default(true)
+  
+  // ─── Contact & Location ───────────────────
+  address                 String?
+  city                    String?
+  province                String?
+  emergencyContact        String?   // تماس اضطراری
+  preferredBranch         String?   // شعبه ترجیحی
+  
+  // ─── Parent/Guardian (for minors) ─────────
+  parentName              String?
+  parentPhone             String?
+  parentRelation          String?   // father | mother | guardian | other
+  
+  // ─── Business Intelligence ────────────────
+  referralSource          String?   // instagram | telegram | google | friend | billboard | website | event | other
+  referralDetail          String?   // جزئیات منبع ارجاع
+  
+  // ─── Instructor-Specific Fields ───────────
+  specialtyFa             String?
+  specialtyEn             String?
+  bioFa                   String?
+  bioEn                   String?
+  experience              String?
+  socialLinks             String?   // JSON
+  
+  // ─── Review Status ─────────────────────────
+  status                  String    @default("pending")  // pending | approved | rejected
+  reviewedBy              String?   // Admin who reviewed
+  reviewedAt              DateTime?
+  adminNotes              String?   // یادداشت ادمین
+  rejectionReason         String?   // دلیل رد درخواست
+  
+  // ─── After Approval ────────────────────────
+  createdUserId           String?   // ID of the Student created after approval
+  
+  // ─── Submission Metadata ───────────────────
+  ipAddress               String?
+  userAgent               String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([status])
+  @@index([phone])
+  @@index([nationalId])
+  @@index([createdAt])
+  @@index([reviewedAt])
+}
+
+// ─────────────────────────────────────────────
+// COURSES & ENROLLMENTS
+// ─────────────────────────────────────────────
+
+model Course {
+  id            String   @id @default(cuid())
+  classCode     String?  @unique  // شناسه یکتای کلاس - برای جلوگیری از تشابه و سردرگمی
+  titleFa       String
+  titleEn       String
+  descriptionFa String?
+  descriptionEn String?
+  category      String?   // instrument | vocal | theory | production
+  instrument    String?   // piano | guitar | violin | drums | vocals | setar | etc.
+  level         String    @default("all")  // beginner | intermediate | advanced | all
+  classType     String    @default("group")  // private | group — خصوصی یا گروهی
+  duration      String?
+  sessionsMin       Int?       // حداقل تعداد جلسات (مثلا ۳)
+  sessionsMax       Int?       // حداکثر تعداد جلسات (مثلا ۵) — اگر مساوی sessionsMin باشد، تعداد دقیق است
+  price             Int?
+  imageUrl      String?
+  coverUrl      String?
+  isFeatured    Boolean   @default(false)
+  isShowOnHome  Boolean   @default(false)
+  isNew         Boolean   @default(false)      // Marked as "new" (within 30 days)
+  isPublished   Boolean   @default(false)
+  branchId      String?
+  instructorId  String?   // Linked instructor (Student with role=instructor)
+
+  // ─── Registration Control ────────────────
+  registrationOpen       Boolean   @default(true)   // آیا ثبت‌نام باز است؟
+  registrationOpenAt     DateTime?                  // زمان شروع ثبت‌نام
+  registrationCloseAt    DateTime?                  // زمان پایان ثبت‌نام
+  maxCapacity            Int?                        // حداکثر ظرفیت کلاس
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  branch        Branch?              @relation(fields: [branchId], references: [id])
+  instructor    Student?             @relation("InstructorCourses", fields: [instructorId], references: [id])
+  enrollments   CourseEnrollment[]
+  schedules     ClassSchedule[]
+  changeRequests ScheduleChangeRequest[]
+  exercises     Exercise[]
+
+  @@index([isPublished])
+  @@index([isFeatured])
+  @@index([isShowOnHome])
+  @@index([instrument])
+  @@index([level])
+  @@index([classType])
+  @@index([registrationOpen])
+}
+
+model CourseEnrollment {
+  id                    String    @id @default(cuid())
+  studentId             String
+  courseId              String
+  status                String     @default("active")  // active | completed | paused | dropped
+  progress              Int        @default(0)         // 0-100%
+  enrolledAt            DateTime   @default(now())
+  completedAt           DateTime?
+  notes                 String?
+
+  // ─── Registration Method (3 methods) ─────
+  registrationMethod    String     @default("online")  // online | phone | in_person
+  /// For online: student fills the form → automatically 'online'
+  /// For phone/in_person: admin fills the form and specifies which method
+  registeredByAdminId   String?    // If admin registered, which admin did it
+
+  // ─── Tuition & Payment ───────────────────
+  tuitionAmount         Int?       // مبلغ شهریه (تومان)
+  paymentStatus         String     @default("unpaid")  // unpaid | paid | partial | waived
+  /// unpaid: ثبت‌نام شده، هنوز تسویه نشده (پیش‌فرض)
+  /// paid: تسویه شده (ادمین تایید کرده)
+  /// partial: پرداخت جزئی (قسطی)
+  /// waived: معاف از پرداخت
+  paidAt                DateTime?  // زمان تسویه حساب
+  paymentDueDate        DateTime?  // مهلت پرداخت شهریه
+  paymentRef            String?    // شماره رسید / مرجع پرداخت (دستی توسط ادمین)
+
+  // ─── Admin Edit Tracking ──────────────────
+  lastEditedByAdminId   String?    // Last admin who edited this enrollment
+  lastEditedAt          DateTime?  // When it was last edited by admin
+
+  student               Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course                Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  payments              Payment[]
+
+  @@unique([studentId, courseId])
+  @@index([studentId])
+  @@index([courseId])
+  @@index([status])
+  @@index([registrationMethod])
+  @@index([paymentStatus])
+  @@index([paidAt])
+}
+
+// ─────────────────────────────────────────────
+// WORKSHOPS
+// ─────────────────────────────────────────────
+
+model Workshop {
+  id            String   @id @default(cuid())
+  titleFa       String
+  titleEn       String
+  descriptionFa String?
+  descriptionEn String?
+  instructorFa  String
+  instructorEn  String
+  date          DateTime
+  startTime     String?
+  endTime       String?
+  price         Int?
+  discountPrice Int?
+  totalSeats    Int      @default(30)
+  reservedSeats Int      @default(0)
+  imageUrl      String?
+  coverUrl      String?
+  category      String?
+  locationFa    String?
+  locationEn    String?
+  requirementsFa String?
+  requirementsEn String?
+  highlightsFa  String?
+  highlightsEn  String?
+  contactPhone  String?
+  registrationDeadline DateTime?
+  isHot         Boolean  @default(false)
+  isFeatured    Boolean  @default(false)
+  isShowOnHome  Boolean  @default(false)
+  isNew         Boolean  @default(false)     // Within 30 days of creation
+  isPublished   Boolean  @default(false)
+  branchId      String?
+
+  // ─── Registration Control ────────────────
+  registrationOpen       Boolean   @default(true)   // آیا ثبت‌نام باز است؟
+  registrationOpenAt     DateTime?                  // زمان شروع ثبت‌نام
+  registrationCloseAt    DateTime?                  // زمان پایان ثبت‌نام
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  branch        Branch?           @relation(fields: [branchId], references: [id])
+  tickets       WorkshopTicket[]
+
+  @@index([isPublished])
+  @@index([isFeatured])
+  @@index([isShowOnHome])
+  @@index([date])
+  @@index([registrationOpen])
+}
+
+model WorkshopTicket {
+  id                    String    @id @default(cuid())
+  studentId             String
+  workshopId            String
+  seatNumber            Int?
+  status                String    @default("reserved") // reserved | paid | cancelled | attended
+  amount                Int?
+
+  // ─── Registration Method ──────────────────
+  registrationMethod    String    @default("online")  // online | phone | in_person
+  registeredByAdminId   String?   // If admin registered
+
+  // ─── Payment Reference (no online gateway) ──
+  paymentRef            String?    // شماره رسید / مرجع پرداخت (دستی توسط ادمین)
+  paidAt                DateTime?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  student               Student   @relation(fields: [studentId], references: [id])
+  workshop              Workshop  @relation(fields: [workshopId], references: [id])
+
+  @@unique([studentId, workshopId])
+  @@index([studentId])
+  @@index([workshopId])
+  @@index([status])
+  @@index([registrationMethod])
+}
+
+// ─────────────────────────────────────────────
+// ANNOUNCEMENTS / NEWS
+// ─────────────────────────────────────────────
+
+model Announcement {
+  id            String   @id @default(cuid())
+  titleFa       String
+  titleEn       String
+  contentFa     String?
+  contentEn     String?
+  type          String   @default("info")   // info | workshop | course | event | urgent | promo
+  priority      Int      @default(0)
+  imageUrl      String?
+  coverUrl      String?  // Optimized cover image
+  isPublished   Boolean  @default(false)
+  isFeatured    Boolean  @default(false)
+  isShowOnHome  Boolean  @default(false)
+  isNew         Boolean  @default(false)     // Within 30 days
+  isPinned      Boolean  @default(false)
+  startsAt      DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([isPublished])
+  @@index([isFeatured])
+  @@index([isShowOnHome])
+  @@index([type])
+  @@index([priority])
+}
+
+// ─────────────────────────────────────────────
+// BRANCHES
+// ─────────────────────────────────────────────
+
+model Branch {
+  id          String    @id @default(cuid())
+  nameFa      String
+  nameEn      String
+  addressFa   String
+  addressEn   String
+  phone       String
+  hoursFa     String
+  hoursEn     String
+  latitude    Float?
+  longitude   Float?
+  isPublished Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  courses     Course[]
+  workshops   Workshop[]
+  classSchedules ClassSchedule[]
+}
+
+// ─────────────────────────────────────────────
+// CONTACT & NEWSLETTER
+// ─────────────────────────────────────────────
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  isRead    Boolean  @default(false)
+  priority  String   @default("normal")  // low | normal | high | urgent
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  isActive  Boolean  @default(true)
+  source    String?  // website | blog | workshop | event | other
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────
+// BLOG SYSTEM - SEO-Optimized Content Marketing
+// ─────────────────────────────────────────────
+
+model BlogCategory {
+  id            String   @id @default(cuid())
+  nameFa        String
+  nameEn        String
+  slugFa        String   @unique
+  slugEn        String   @unique
+  descriptionFa String?
+  descriptionEn String?
+  color         String   @default("#8B2252")
+  icon          String?
+  order         Int      @default(0)
+  isPublished   Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  posts         BlogPostToCategory[]
+
+  @@index([order])
+}
+
+model BlogPost {
+  id                String       @id @default(cuid())
+  titleFa           String
+  titleEn           String
+  slugFa            String       @unique
+  slugEn            String       @unique
+  contentFa         String
+  contentEn         String
+  excerptFa         String?
+  excerptEn         String?
+  coverUrl          String?
+  coverAltFa        String?
+  coverAltEn        String?
+  tags              String?      // JSON array of tags
+  metaTitleFa       String?
+  metaTitleEn       String?
+  metaDescriptionFa String?
+  metaDescriptionEn String?
+  keywords          String?
+  readingTime       Int          @default(0)
+  authorId          String?
+  sourceType        String       @default("manual")  // manual | ai_generated | ai_assisted | auto_published
+  isPublished       Boolean      @default(false)
+  isFeatured        Boolean      @default(false)
+  isShowOnHome      Boolean      @default(false)
+  isPinned          Boolean      @default(false)
+  isNew             Boolean      @default(false)     // Auto-flagged if within 30 days of creation
+  publishedAt       DateTime?
+  viewCount         Int          @default(0)
+  uniqueViewCount   Int          @default(0)
+  shareCount        Int          @default(0)
+  likeCount         Int          @default(0)
+  avgReadTime       Float        @default(0)
+  bounceRate        Float        @default(0)
+  order             Int          @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  categories        BlogPostToCategory[]
+  author            Student?            @relation(fields: [authorId], references: [id])
+  images            BlogImage[]
+  dailyAnalytics    BlogPostDailyAnalytics[]
+  viewLogs          BlogViewLog[]
+
+  @@index([slugFa])
+  @@index([slugEn])
+  @@index([isPublished])
+  @@index([isFeatured])
+  @@index([isShowOnHome])
+  @@index([isPinned])
+  @@index([publishedAt])
+  @@index([sourceType])
+  @@index([createdAt])
+}
+
+/// Multiple image sizes per blog post
+model BlogImage {
+  id          String   @id @default(cuid())
+  postId      String
+  sizeKey     String   // thumbnail | small | medium | large | hero | og_image | square | wide
+  url         String
+  width       Int?
+  height      Int?
+  fileSize    Int?
+  altFa       String?
+  altEn       String?
+  quality     Int      @default(80)
+  format      String   @default("webp")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  post        BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, sizeKey])
+  @@index([postId])
+  @@index([sizeKey])
+}
+
+model BlogPostToCategory {
+  postId     String
+  categoryId String
+  assignedAt DateTime @default(now())
+
+  post       BlogPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category   BlogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([postId, categoryId])
+}
+
+model BlogPostDailyAnalytics {
+  id              String   @id @default(cuid())
+  postId          String
+  date            String   // YYYY-MM-DD
+  views           Int      @default(0)
+  uniqueViews     Int      @default(0)
+  avgReadTime     Float    @default(0)
+  avgReadProgress Float    @default(0)
+  shares          Int      @default(0)
+  likes           Int      @default(0)
+  bounceRate      Float    @default(0)
+  sourceDirect    Int      @default(0)
+  sourceSearch    Int      @default(0)
+  sourceSocial    Int      @default(0)
+  sourceReferral  Int      @default(0)
+  deviceDesktop   Int      @default(0)
+  deviceMobile    Int      @default(0)
+  deviceTablet    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  post            BlogPost @relation(fields: [postId], references: [id])
+
+  @@unique([postId, date])
+  @@index([postId])
+  @@index([date])
+}
+
+model BlogViewLog {
+  id             String   @id @default(cuid())
+  postId         String
+  viewedAt       DateTime @default(now())
+  readProgress   Float    @default(0)
+  timeOnPage     Int      @default(0)
+  referrer       String?
+  source         String   @default("direct")
+  deviceType     String   @default("desktop")
+  userAgent      String?
+  country        String?
+  sessionId      String?
+  createdAt      DateTime @default(now())
+
+  post           BlogPost @relation(fields: [postId], references: [id])
+
+  @@index([postId])
+  @@index([viewedAt])
+}
+
+// ─────────────────────────────────────────────
+// MEDIA LIBRARY
+// ─────────────────────────────────────────────
+
+model Media {
+  id           String   @id @default(cuid())
+  url          String
+  altFa        String?
+  altEn        String?
+  title        String?
+  type         String   @default("image")
+  mimeType     String?
+  fileSize     Int?
+  width        Int?
+  height       Int?
+  thumbnailUrl String?
+  isUsed       Boolean  @default(false)
+  uploadedBy   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([type])
+  @@index([isUsed])
+}
+
+// ─────────────────────────────────────────────
+// SITE SETTINGS
+// ─────────────────────────────────────────────
+
+model SiteSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// PAYMENTS
+// ─────────────────────────────────────────────
+
+model Payment {
+  id                    String    @id @default(cuid())
+  studentId             String
+  amount                Int       // مبلغ به تومان
+  type                  String    // course | workshop | registration | other
+  status                String    @default("pending")  // pending | paid | failed | refunded | overdue
+  referenceId           String?   // شماره تراکنش
+  description           String?
+  relatedId             String?   // ID of the related course/workshop
+  paidAt                DateTime?
+
+  // ─── Enhanced Payment Fields ──────────────
+  paymentType           String    @default("full")     // full | installment | partial
+  paymentMethod         String?   // cash | card_transfer | online_gateway | cheque | other
+  paymentRef            String?   // شماره رسید / مرجع پرداخت (دستی توسط ادمین)
+  notes                 String?   // یادداشت پرداخت
+
+  // ─── Installment Support ─────────────────
+  installmentNumber     Int?      // شماره قسط (مثلا ۱ از ۳)
+  totalInstallments     Int?      // تعداد کل اقساط
+  installmentPlanId     String?   // شناسه طرح قسطی
+  dueDate               DateTime? // مهلت پرداخت این قسط
+
+  // ─── Relations ────────────────────────────
+  enrollmentId          String?   // Related course enrollment
+  ticketId              String?   // Related workshop ticket
+  receivedBy            String?   // Admin who received the payment
+  createdBy             String?   // Admin who created the record
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  student               Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  enrollment            CourseEnrollment?  @relation(fields: [enrollmentId], references: [id])
+
+  @@index([studentId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@index([paymentType])
+  @@index([paymentMethod])
+  @@index([installmentPlanId])
+  @@index([enrollmentId])
+}
+
+// ─────────────────────────────────────────────
+// EXERCISES & STUDENT WORK
+// ─────────────────────────────────────────────
+
+model Exercise {
+  id            String   @id @default(cuid())
+  titleFa       String
+  titleEn       String
+  descriptionFa String?
+  descriptionEn String?
+  type          String   @default("practice")  // practice | theory | performance | composition
+  difficulty    String   @default("beginner")  // beginner | intermediate | advanced
+  courseId      String?
+  instructorId  String?  // Student with role=instructor who created this
+  dueDate       DateTime?
+  isPublished   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  course        Course?  @relation(fields: [courseId], references: [id])
+  instructor    Student? @relation("InstructorExercises", fields: [instructorId], references: [id])
+  submissions   StudentExercise[]
+
+  @@index([courseId])
+  @@index([instructorId])
+  @@index([isPublished])
+}
+
+model StudentExercise {
+  id          String    @id @default(cuid())
+  studentId   String
+  exerciseId  String
+  status      String    @default("assigned")  // assigned | submitted | graded | late
+  grade       Int?
+  feedback    String?
+  submittedAt DateTime?
+  gradedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  exercise    Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, exerciseId])
+  @@index([studentId])
+  @@index([exerciseId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// CLASS SCHEDULES - Weekly recurring & one-time
+// Admin creates when opening a class registration
+// ─────────────────────────────────────────────
+
+/// Class schedule - represents when a class meets
+/// Supports both recurring (weekly) and one-time sessions
+model ClassSchedule {
+  id            String    @id @default(cuid())
+  courseId      String    // Which course this schedule belongs to
+  instructorId  String    // Instructor teaching this session
+  branchId      String?   // Which branch
+
+  // ─── Schedule Timing ──────────────────────
+  dayOfWeek     Int       // 0=Saturday, 1=Sunday, 2=Monday, 3=Tuesday, 4=Wednesday, 5=Thursday, 6=Friday (Persian week)
+  startTime     String    // "14:00" - HH:mm format
+  endTime       String    // "16:00" - HH:mm format
+
+  // ─── Schedule Type ────────────────────────
+  isRecurring   Boolean   @default(true)   // true = weekly repeating, false = one-time
+  specificDate  DateTime?                  // For one-time sessions or makeup classes
+
+  // ─── Room & Capacity ──────────────────────
+  room          String?   // اتاق ۱، سالن اصلی، etc.
+  capacity      Int?      // ظرفیت این جلسه خاص
+
+  // ─── Status ───────────────────────────────
+  status        String    @default("active")  // active | cancelled | completed
+  cancelReason  String?   // دلیل لغو
+  cancelledAt   DateTime?
+  cancelledBy   String?   // Admin or instructor who cancelled
+
+  // ─── Metadata ─────────────────────────────
+  notes         String?   // یادداشت
+  sessionNumber Int?      // شماره جلسه (مثلاً جلسه ۳ از ۸)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  course        Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructor    Student   @relation("InstructorSchedules", fields: [instructorId], references: [id], onDelete: Cascade)
+  branch        Branch?   @relation(fields: [branchId], references: [id])
+  changeRequests ScheduleChangeRequest[]
+
+  @@index([courseId])
+  @@index([instructorId])
+  @@index([branchId])
+  @@index([dayOfWeek])
+  @@index([status])
+  @@index([isRecurring])
+  @@index([specificDate])
+}
+
+// ─────────────────────────────────────────────
+// SCHEDULE CHANGE REQUESTS
+// Instructors request time changes or cancellations
+// Admins approve/reject, changes propagate to student schedules
+// ─────────────────────────────────────────────
+
+/// Instructor requests for schedule changes
+/// All requests stored in DB for future analysis
+model ScheduleChangeRequest {
+  id              String    @id @default(cuid())
+  instructorId    String    // Instructor making the request
+  scheduleId      String    // Which class schedule this refers to
+  courseId        String    // Which course
+
+  // ─── Request Type & Details ───────────────
+  requestType     String    // time_change | cancellation | room_change | reschedule
+  reason          String    // دلیل درخواست
+
+  // ─── Proposed Changes (JSON) ──────────────
+  proposedChanges String    // JSON: { dayOfWeek?, startTime?, endTime?, room?, specificDate? }
+
+  // ─── Review Status ────────────────────────
+  status          String    @default("pending")  // pending | approved | rejected
+  adminResponse   String?   // پاسخ ادمین
+  reviewedBy      String?   // Admin who reviewed
+  reviewedAt      DateTime?
+
+  // ─── Applied Changes ──────────────────────
+  isApplied       Boolean   @default(false)  // Whether the change was applied to the schedule
+  appliedAt       DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  instructor      Student        @relation("InstructorChangeRequests", fields: [instructorId], references: [id], onDelete: Cascade)
+  schedule        ClassSchedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  course          Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([instructorId])
+  @@index([scheduleId])
+  @@index([courseId])
+  @@index([status])
+  @@index([requestType])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────
+// TESTIMONIALS / REVIEWS - نظرات و بازخوردها
+// Admin/Super Admin approval required before publishing
+// Google integration for authenticity (anti-fake)
+// ─────────────────────────────────────────────
+
+/// Testimonials/Reviews from students and visitors
+/// Only published after admin/super admin approval
+/// Google email integration for authenticity — shows username and Google avatar
+model Testimonial {
+  id              String    @id @default(cuid())
+
+  // ─── Author Info ──────────────────────────
+  name            String                          // نام نویسنده نظر
+  email           String                          // ایمیل (ترجیحاً ایمیل گوگل)
+  googleAvatarUrl String?                         // عکس پروفایل گوگل (برای اعتبار)
+  googleEmail     String?                         // ایمیل گوگل (اگر متفاوت از ایمیل اصلی)
+  studentId       String?                         // اگر هنرجو ثبت‌نام‌شده است
+
+  // ─── Review Content ───────────────────────
+  rating          Int       @default(5)           // ۱ تا ۵ ستاره
+  titleFa         String?                         // عنوان نظر فارسی
+  titleEn         String?                         // عنوان نظر انگلیسی
+  contentFa       String                          // متن نظر فارسی
+  contentEn       String?                         // متن نظر انگلیسی
+
+  // ─── Context ──────────────────────────────
+  courseId        String?                         // مربوط به چه دوره‌ای (اختیاری)
+  workshopId      String?                         // مربوط به چه کارگاهی (اختیاری)
+  instrument      String?                         // ساز مرتبط (اختیاری)
+
+  // ─── Source ───────────────────────────────
+  source          String    @default("contact")   // contact | google | direct | admin_added
+  /// contact: از فرم تماس با ما
+  /// google: از طریق ایمیل گوگل تأیید شده
+  /// direct: مستقیم ثبت شده
+  /// admin_added: ادمین اضافه کرده
+
+  // ─── Admin Review & Publishing ────────────
+  isPublished     Boolean   @default(false)        // آیا منتشر شده در سایت
+  isApproved      Boolean   @default(false)        // آیا توسط ادمین/سوپر ادمین تأیید شده
+  approvedBy      String?                          // کدام ادمین تأیید کرده
+  approvedAt      DateTime?                        // زمان تأیید
+  isFeatured      Boolean   @default(false)        // نظر ویژه (نمایش برتر)
+  displayOrder    Int       @default(0)            // ترتیب نمایش
+
+  // ─── Status ───────────────────────────────
+  status          String    @default("pending")    // pending | approved | published | rejected | hidden
+  rejectionReason String?                          // دلیل رد شدن (در صورت رد)
+  adminNotes      String?                          // یادداشت داخلی ادمین
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([isPublished])
+  @@index([isApproved])
+  @@index([isFeatured])
+  @@index([status])
+  @@index([rating])
+  @@index([source])
+  @@index([studentId])
+  @@index([courseId])
+  @@index([displayOrder])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────
+// INSTRUCTOR FEEDBACK - بازخورد اساتید
+// Students rate instructors after course completion
+// Critical for AI analysis: performance, firing, hiring decisions
+// ─────────────────────────────────────────────
+
+/// Student feedback/ratings for instructors
+/// Used for AI analysis of instructor performance, hiring/firing decisions
+model InstructorFeedback {
+  id              String    @id @default(cuid())
+
+  // ─── Who ──────────────────────────────────
+  instructorId    String    // استادی که بازخورد درباره اوست
+  studentId       String    // هنرجویی که بازخورد را داده
+
+  // ─── Context ──────────────────────────────
+  courseId        String?   // مربوط به چه دوره‌ای
+  classScheduleId String?   // مربوط به چه کلاسی
+
+  // ─── Rating & Feedback ────────────────────
+  teachingQuality  Int      // کیفیت تدریس (1-5)
+  punctuality      Int      // وقت‌شناسی (1-5)
+  communication    Int      // ارتباط با هنرجو (1-5)
+  overallRating    Int      // امتیاز کلی (1-5)
+  commentFa        String?  // نظر فارسی
+  commentEn        String?  // نظر انگلیسی
+
+  // ─── Status ───────────────────────────────
+  isAnonymous     Boolean   @default(false)  // آیا بازخورد ناشناس است
+  status          String    @default("pending")  // pending | approved | hidden | flagged
+
+  // ─── AI Analysis ──────────────────────────
+  sentimentScore  Float?    // AI-calculated sentiment (-1 to 1)
+  keywords        String?   // JSON array: AI-extracted keywords
+  aiCategory      String?   // AI category: positive | negative | mixed | neutral
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  instructor      Student   @relation("InstructorReceivedFeedback", fields: [instructorId], references: [id], onDelete: Cascade)
+  student         Student   @relation("StudentWrittenFeedback", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([instructorId, studentId, courseId])
+  @@index([instructorId])
+  @@index([studentId])
+  @@index([courseId])
+  @@index([overallRating])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────
+// ATTENDANCE - حضور و غیاب
+// Track student attendance per session
+// Critical for: churn prediction, engagement scoring, AI analytics
+// ─────────────────────────────────────────────
+
+/// Student attendance per class session
+/// Used for AI churn prediction, engagement analysis, and reporting
+model Attendance {
+  id              String    @id @default(cuid())
+
+  // ─── Who & Where ─────────────────────────
+  studentId       String    // هنرجو
+  courseId        String    // دوره
+  classScheduleId String?   // کلاس (اختیاری)
+  instructorId    String?   // استاد (denormalized for fast queries)
+
+  // ─── Session Info ─────────────────────────
+  sessionDate     String    // تاریخ جلسه (ISO string, display as Shamsi)
+  sessionNumber   Int?      // شماره جلسه (مثلا جلسه ۳ از ۸)
+
+  // ─── Attendance Status ────────────────────
+  status          String    @default("present")  // present | absent | late | excused | makeup
+  arrivalTime     String?   // زمان ورود (if late)
+  notes           String?   // یادداشت
+
+  // ─── Makeup Tracking ──────────────────────
+  makeupForDate   String?   // اگر این جلسه جایگزین است، تاریخ جلسه اصلی
+  isMakeup        Boolean   @default(false)  // آیا جلسه جایگزین (جبرانی) است
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  student         Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId, sessionDate])
+  @@index([studentId])
+  @@index([courseId])
+  @@index([instructorId])
+  @@index([status])
+  @@index([sessionDate])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────
+// WEBSITE EVENTS - کلیک‌ها و تعاملات سایت
+// Track page views, clicks, and interactions
+// Critical for: AI-driven UX optimization, conversion analysis
+// ─────────────────────────────────────────────
+
+/// Website interaction events for analytics
+/// All clicks, page views, and interactions are logged
+model WebsiteEvent {
+  id              String    @id @default(cuid())
+
+  // ─── Who ──────────────────────────────────
+  userId          String?   // If logged in
+  sessionId       String?   // Browser session ID (for anonymous tracking)
+
+  // ─── What ─────────────────────────────────
+  eventType       String    // page_view | click | form_submit | scroll | video_play | cta_click | course_view | instructor_view | workshop_view | registration_start | registration_complete
+  elementId       String?   // ID of the clicked element
+  elementText     String?   // Text of the clicked element
+  pagePath        String?   // URL path
+
+  // ─── Context ──────────────────────────────
+  referrer        String?   // Where did they come from
+  utmSource       String?   // UTM source
+  utmMedium       String?   // UTM medium
+  utmCampaign     String?   // UTM campaign
+
+  // ─── Device ───────────────────────────────
+  deviceType      String?   // desktop | mobile | tablet
+  browser         String?
+  os              String?
+  screenWidth     Int?
+  language        String?   // fa | en
+
+  // ─── Location ─────────────────────────────
+  country         String?
+  city            String?
+  ipAddress       String?
+
+  // ─── Duration ─────────────────────────────
+  timeOnPage      Int?      // seconds spent on page
+  scrollDepth     Float?    // 0-1 scroll percentage
+
+  // ─── Related Entity ───────────────────────
+  relatedEntityType String?  // course | workshop | instructor | blog_post
+  relatedEntityId   String?  // ID of the related entity
+
+  createdAt       DateTime  @default(now())
+
+  @@index([eventType])
+  @@index([userId])
+  @@index([pagePath])
+  @@index([createdAt])
+  @@index([utmSource])
+  @@index([relatedEntityType])
+  @@index([relatedEntityId])
+}
+
+// ─────────────────────────────────────────────
+// SESSION LOG - لاگ جلسات برگزار شده
+// Records each class session that actually took place
+// Critical for: instructor hours tracking, student attendance, AI analytics
+// ─────────────────────────────────────────────
+
+/// Log of class sessions that actually took place
+/// Used for instructor hour tracking, attendance, and AI analytics
+model SessionLog {
+  id              String    @id @default(cuid())
+
+  // ─── What Class ──────────────────────────
+  courseId        String    // دوره
+  classScheduleId String?   // برنامه کلاس (اختیاری)
+  classCode       String?   // شناسه یکتای کلاس - for quick identification
+
+  // ─── Who ──────────────────────────────────
+  instructorId    String    // استاد
+  branchId        String?   // شعبه
+
+  // ─── When ─────────────────────────────────
+  sessionDate     String    // تاریخ جلسه (ISO, display as Shamsi)
+  startTime       String    // شروع - "14:00"
+  endTime         String    // پایان - "16:00"
+  sessionNumber   Int?      // شماره جلسه
+
+  // ─── Attendance Summary ───────────────────
+  totalEnrolled   Int       @default(0)  // تعداد ثبت‌نام‌شده
+  totalPresent    Int       @default(0)  // تعداد حاضرین
+  totalAbsent     Int       @default(0)  // تعداد غایبین
+  totalLate       Int       @default(0)  // تعداد دیررسیده‌ها
+
+  // ─── Session Details ──────────────────────
+  sessionStatus   String    @default("completed")  // completed | cancelled | shortened | extended
+  cancelReason    String?   // دلیل لغو (در صورت لغو)
+  topics          String?   // JSON array: مباحث تدریس‌شده
+  notes           String?   // یاددات
+
+  // ─── Quality Tracking ─────────────────────
+  instructorPresent Boolean  @default(true)  // آیا استاد حاضر بود
+  startedOnTime   Boolean   @default(true)  // آیا به موقع شروع شد
+  endedOnTime     Boolean   @default(true)  // آیا به موقع تمام شد
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([courseId])
+  @@index([instructorId])
+  @@index([branchId])
+  @@index([sessionDate])
+  @@index([sessionStatus])
+  @@index([classCode])
+  @@index([createdAt])
+}
