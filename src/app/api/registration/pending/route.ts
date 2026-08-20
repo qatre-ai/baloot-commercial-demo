@@ -5,6 +5,13 @@ import {
   getClientIp,
   getUserAgent,
 } from "@/lib/auth/session";
+import {
+  isValidIranianMobile,
+  isValidIranianNationalId,
+  normalizeDigits,
+  normalizeIranianPhone,
+} from "@/lib/validation/identifiers";
+import { resolveInstrumentProfile } from "@/lib/validation/instruments";
 
 // POST /api/registration/pending - Submit a new online registration (public endpoint)
 export async function POST(request: NextRequest) {
@@ -28,20 +35,50 @@ export async function POST(request: NextRequest) {
       specialtyFa, specialtyEn, bioFa, bioEn, experience, socialLinks,
     } = body;
 
-    // Validate required fields
-    if (!name || !phone || !nationalId) {
+    const normalizedPhone = normalizeIranianPhone(String(phone || ""));
+    const normalizedNationalId = normalizeDigits(String(nationalId || "")).trim();
+
+    if (role && role !== "student") {
+      return NextResponse.json(
+        { error: "ثبت‌نام عمومی فقط برای هنرجویان فعال است." },
+        { status: 403 }
+      );
+    }
+
+    const instrumentProfile = resolveInstrumentProfile({
+      registrationInstrument,
+      primaryInstrument,
+      secondaryInstruments,
+    });
+
+    if (!name || !normalizedPhone || !normalizedNationalId) {
       return NextResponse.json(
         { error: "نام، شماره تماس و کد ملی الزامی است" },
         { status: 400 }
       );
     }
 
+    if (!instrumentProfile.registrationInstrument) {
+      return NextResponse.json(
+        { error: "ساز ثبت‌نامی الزامی است." },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidIranianMobile(normalizedPhone)) {
+      return NextResponse.json({ error: "شماره موبایل معتبر نیست." }, { status: 400 });
+    }
+
+    if (!isValidIranianNationalId(normalizedNationalId)) {
+      return NextResponse.json({ error: "کد ملی باید ۱۰ رقم باشد." }, { status: 400 });
+    }
+
     // Auto-generate email if not provided
-    const finalEmail = email?.trim() || `${phone}@mab.local`;
+    const finalEmail = email?.trim().toLowerCase() || `${normalizedPhone}@mab.local`;
 
     // Check if phone already exists in PendingRegistration (any status)
     const existingPendingPhone = await db.pendingRegistration.findFirst({
-      where: { phone },
+      where: { phone: normalizedPhone },
     });
     if (existingPendingPhone) {
       return NextResponse.json(
@@ -52,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     // Check if phone already exists in Student table
     const existingStudentPhone = await db.student.findFirst({
-      where: { phone },
+      where: { phone: normalizedPhone },
     });
     if (existingStudentPhone) {
       return NextResponse.json(
@@ -63,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     // Check if nationalId already exists in Student table
     const existingNationalId = await db.student.findFirst({
-      where: { nationalId },
+      where: { nationalId: normalizedNationalId },
     });
     if (existingNationalId) {
       return NextResponse.json(
@@ -77,19 +114,19 @@ export async function POST(request: NextRequest) {
       const registration = await tx.pendingRegistration.create({
         data: {
           name,
-          phone,
-          nationalId,
+          phone: normalizedPhone,
+          nationalId: normalizedNationalId,
           email: finalEmail,
-          role: role || "student",
+          role: "student",
           // Personal information
           dateOfBirth: dateOfBirth || null,
           gender: gender || null,
           educationLevel: educationLevel || null,
           fieldOfStudy: fieldOfStudy || null,
           // Music profile
-          registrationInstrument: registrationInstrument || null,
-          primaryInstrument: primaryInstrument || null,
-          secondaryInstruments: secondaryInstruments || null,
+          registrationInstrument: instrumentProfile.registrationInstrument,
+          primaryInstrument: instrumentProfile.primaryInstrument,
+          secondaryInstruments: instrumentProfile.secondaryInstruments,
           musicExperienceYears: musicExperienceYears ? parseInt(String(musicExperienceYears)) : null,
           previousTraining: previousTraining || null,
           musicGenres: musicGenres || null,
@@ -132,15 +169,16 @@ export async function POST(request: NextRequest) {
       });
 
       if (admins.length > 0) {
-        const roleLabel = (role || "student") === "instructor" ? "مدرس" : "هنرجو";
-        const instrument = registrationInstrument || primaryInstrument || "نامشخص";
+        const roleLabel = "هنرجو";
+        const instrument =
+          instrumentProfile.registrationInstrument || "نامشخص";
 
         await tx.adminMessage.createMany({
           data: admins.map((admin) => ({
             senderId: admin.id, // System message - sender is same as recipient
             recipientId: admin.id,
             subject: `درخواست ثبت‌نام جدید ${roleLabel}: ${name}`,
-            content: `${roleLabel} جدیدی به نام ${name} درخواست ثبت‌نام داده است.\n\nشماره تماس: ${phone}\nکد ملی: ${nationalId}\nایمیل: ${finalEmail}\nساز: ${instrument}\n\nاین درخواست در انتظار بررسی و تایید مدیران است.`,
+            content: `${roleLabel} جدیدی به نام ${name} درخواست ثبت‌نام داده است.\n\nشماره تماس: ${normalizedPhone}\nکد ملی: ${normalizedNationalId}\nایمیل: ${finalEmail}\nساز ثبت‌نامی: ${instrument}\nساز اصلی: ${instrumentProfile.primaryInstrument || "نامشخص"}\n\nاین درخواست در انتظار بررسی و تایید مدیران است.`,
             priority: "high",
             isSystemMessage: true,
           })),

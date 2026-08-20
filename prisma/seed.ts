@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { hash } from "./seed-utils";
+import { allPermissionPairs, permissionsForRole } from "../src/lib/auth/permissions";
 
 const prisma = new PrismaClient();
 
@@ -1093,15 +1094,6 @@ const posts = [
 // ============================================
 // Admin Permissions - Full RBAC for super_admin
 // ============================================
-const permissionResources = [
-  "users", "courses", "workshops", "blog", "announcements",
-  "instructors", "branches", "media", "backups", "settings",
-  "messages", "analytics",
-];
-const permissionActions = [
-  "create", "read", "update", "delete", "publish", "manage", "feature",
-];
-
 async function main() {
   console.log("🌱 Seeding database for مهر آوای بلوط...");
   console.log("=" .repeat(50));
@@ -1184,23 +1176,28 @@ async function main() {
   // ============================================
   console.log("\n🔑 Assigning permissions to super_admin...");
 
-  const superAdminPermissions = [];
-  for (const resource of permissionResources) {
-    for (const action of permissionActions) {
-      superAdminPermissions.push({
-        adminId: superAdmin.id,
-        resource,
-        action,
-        granted: true,
-        grantedBy: superAdmin.id,
-      });
-    }
-  }
+  const superAdminPermissions = allPermissionPairs().map(({ resource, action }) => ({
+    adminId: superAdmin.id,
+    resource,
+    action,
+    granted: true,
+    grantedBy: superAdmin.id,
+  }));
 
   await prisma.adminPermission.createMany({
     data: superAdminPermissions,
   });
   console.log(`  ✅ ${superAdminPermissions.length} permissions assigned to super_admin`);
+
+  const branchAdminPermissions = permissionsForRole(branchAdmin.role).map(({ resource, action }) => ({
+    adminId: branchAdmin.id,
+    resource,
+    action,
+    granted: true,
+    grantedBy: superAdmin.id,
+  }));
+  await prisma.adminPermission.createMany({ data: branchAdminPermissions });
+  console.log(`  ✅ ${branchAdminPermissions.length} permissions assigned to branch admin`);
 
   // ============================================
   // Step 2: Create Branches

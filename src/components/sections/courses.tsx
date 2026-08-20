@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
-import { useAuthStore } from "@/lib/auth/store";
+import { authFetch, useAuthStore } from "@/lib/auth/store";
 import { cn } from "@/lib/utils";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { SectionReveal } from "@/components/ui/section-reveal";
@@ -174,16 +175,20 @@ function CourseDetailModal({ course, isOpen, onClose, isRTL }: {
   // Auto-fill user info when logged in
   useEffect(() => {
     if (isAuthenticated && user) {
-      setUserName(user.name || "");
-      setUserPhone(user.phone || "");
+      deferEffect(() => {
+        setUserName(user.name || "");
+        setUserPhone(user.phone || "");
+      });
     }
   }, [isAuthenticated, user]);
 
   // Reset state when course changes
   useEffect(() => {
-    setEnrollResult("idle");
-    setShowEnrollForm(false);
-    setErrorMessage("");
+    deferEffect(() => {
+      setEnrollResult("idle");
+      setShowEnrollForm(false);
+      setErrorMessage("");
+    });
   }, [course?.id]);
 
   if (!course) return null;
@@ -204,16 +209,10 @@ function CourseDetailModal({ course, isOpen, onClose, isRTL }: {
     setIsEnrolling(true);
     setEnrollResult("idle");
     try {
-      const res = await fetch("/api/admin/enrollments", {
+      const res = await authFetch("/api/student/class-register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studentId: user?.id,
-          courseId: course.id,
-          registrationMethod: "online",
-          paymentStatus: "unpaid",
-          tuitionAmount: course.price,
-        }),
+        body: JSON.stringify({ courseId: course.id }),
       });
 
       if (!res.ok) {

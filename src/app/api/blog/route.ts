@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth/session";
+import { getSession, requireAdmin } from "@/lib/auth/session";
 import {
   transformPostCategories,
   estimateReadingTime,
@@ -230,10 +230,9 @@ export async function GET(request: NextRequest) {
 // POST /api/blog — create a new blog post (admin only)
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session || session.userType !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+    const auth = await requireAdmin(request, "blog", "create");
+    if (!auth.ok) return auth.response;
+    const session = auth.session;
 
     const body = await request.json();
     const {
@@ -256,6 +255,7 @@ export async function POST(request: NextRequest) {
       metaDescriptionEn,
       keywords,
       authorId,
+      sourceType,
       isPublished,
       isFeatured,
       isShowOnHome,
@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
     const readingTime = estimateReadingTime(contentFa);
 
     // If publishing and no publishedAt, set it to now
-    const shouldPublish = isPublished === true;
+    const shouldPublish = sourceType !== "ai_assisted" && isPublished === true;
     const publishedAt = shouldPublish ? new Date() : null;
 
     // Create the post first
@@ -302,6 +302,7 @@ export async function POST(request: NextRequest) {
         keywords: keywords ?? null,
         readingTime,
         authorId: authorId ?? session.userId,
+        sourceType: sourceType === "ai_assisted" ? "ai_assisted" : "manual",
         isPublished: shouldPublish,
         isFeatured: isFeatured ?? false,
         isShowOnHome: isShowOnHome ?? false,

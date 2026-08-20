@@ -13,21 +13,28 @@ export async function GET(request: NextRequest) {
 
     const where = isAdmin && showAll ? {} : { isPublished: true };
 
-    const categories = await db.blogCategory.findMany({
-      where,
-      orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-      include: {
-        _count: {
-          select: {
-            posts: isAdmin && showAll ? undefined : {
-              where: {
-                post: { isPublished: true },
+    const categories =
+      isAdmin && showAll
+        ? await db.blogCategory.findMany({
+            where,
+            orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+            include: { _count: { select: { posts: true } } },
+          })
+        : await db.blogCategory.findMany({
+            where,
+            orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+            include: {
+              _count: {
+                select: {
+                  posts: {
+                    where: {
+                      post: { isPublished: true },
+                    },
+                  },
+                },
               },
             },
-          },
-        },
-      },
-    });
+          });
 
     return NextResponse.json(categories);
   } catch (error) {

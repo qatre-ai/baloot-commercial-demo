@@ -83,7 +83,7 @@ export function SectionReveal({
   margin = "-80px",
 }: SectionRevealProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once, amount: 0.1, margin });
+  const isInView = useInView(ref, { once, amount: 0.1, margin: margin as any });
   const prefersReducedMotion = usePrefersReducedMotion();
 
   const variant = variants[animation];
@@ -126,7 +126,7 @@ export function StaggerContainer({
   margin = "-80px",
 }: StaggerContainerProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once, amount: 0.1, margin });
+  const isInView = useInView(ref, { once, amount: 0.1, margin: margin as any });
   const prefersReducedMotion = usePrefersReducedMotion();
 
   if (prefersReducedMotion) {

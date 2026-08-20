@@ -97,6 +97,18 @@ export async function POST(
 
     // Create ticket and increment reserved seats, then notify admins
     const ticket = await db.$transaction(async (tx) => {
+      const reservation = await tx.workshop.updateMany({
+        where: {
+          id,
+          registrationOpen: true,
+          reservedSeats: { lt: workshop.totalSeats },
+        },
+        data: { reservedSeats: { increment: 1 } },
+      });
+      if (reservation.count !== 1) {
+        throw new Error("CAPACITY_REACHED");
+      }
+
       const newTicket = await tx.workshopTicket.create({
         data: {
           studentId: session.userId,
@@ -106,11 +118,6 @@ export async function POST(
           seatNumber: workshop.reservedSeats + 1,
           registrationMethod: "online",
         },
-      });
-
-      await tx.workshop.update({
-        where: { id },
-        data: { reservedSeats: { increment: 1 } },
       });
 
       // Notify all admins about the new reservation
@@ -144,6 +151,9 @@ export async function POST(
       message: "ثبت‌نام شما با موفقیت انجام شد و به زودی همکاران ما با شما تماس خواهند گرفت"
     }, { status: 201 });
   } catch (error) {
+    if (error instanceof Error && error.message === "CAPACITY_REACHED") {
+      return NextResponse.json({ error: "No seats available" }, { status: 400 });
+    }
     console.error("[WORKSHOP_PURCHASE]", error);
     return NextResponse.json({ error: "Failed to reserve ticket" }, { status: 500 });
   }

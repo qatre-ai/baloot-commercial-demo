@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
 import { useAuthStore, authFetch } from "@/lib/auth/store";
 import { useAdminPermissions } from "@/lib/auth/use-admin-permissions";
@@ -85,6 +86,36 @@ function useDebouncedValue<T>(value: T, delay = 300): T {
     return () => clearTimeout(t);
   }, [value, delay]);
   return debounced;
+}
+
+function SuperAdminChartTooltip({
+  active,
+  payload,
+  label,
+  isRTL,
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number; name: string; color: string }>;
+  label?: string;
+  isRTL: boolean;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-background border border-border rounded-lg px-3 py-2 shadow-lg text-xs">
+      <p className="font-medium mb-1">{label}</p>
+      {payload.map((item, index) => (
+        <div key={`${item.name}-${index}`} className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+          <span className="text-muted-foreground">{item.name}:</span>
+          <span className="font-medium">
+            {item.name.includes(isRTL ? "Ø¯Ø±Ø¢Ù…Ø¯" : "Revenue") || item.name.includes("ØªÙˆÙ…Ø§Ù†") || item.name.includes("Toman")
+              ? formatToman(item.value, isRTL)
+              : isRTL ? toPersianDigits(item.value) : item.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ============================================
@@ -847,7 +878,7 @@ function DashboardTab({ isRTL, onNavigate }: { isRTL: boolean; onNavigate?: (tab
     finally { setLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchDash(); }, [fetchDash]);
+  useEffect(() => { deferEffect(fetchDash); }, [fetchDash]);
 
   // Auto-refresh every 60 seconds
   useEffect(() => {
@@ -902,7 +933,7 @@ function DashboardTab({ isRTL, onNavigate }: { isRTL: boolean; onNavigate?: (tab
     const l = labels[e.status] || { fa: e.status, en: e.status };
     return {
       name: isRTL ? l.fa : l.en,
-      value: e._count,
+      value: e._count.status,
       fill: CHART_COLORS[idx % CHART_COLORS.length],
     };
   });
@@ -916,7 +947,7 @@ function DashboardTab({ isRTL, onNavigate }: { isRTL: boolean; onNavigate?: (tab
       prefer_not_to_say: { fa: "نامشخص", en: "Undisclosed" },
     };
     const l = labels[g.gender] || { fa: g.gender, en: g.gender };
-    return { name: isRTL ? l.fa : l.en, value: g._count, fill: CHART_COLORS[idx % CHART_COLORS.length] };
+    return { name: isRTL ? l.fa : l.en, value: g._count.gender, fill: CHART_COLORS[idx % CHART_COLORS.length] };
   });
 
   // ─── Registration method chart (from enrollments) ───
@@ -1144,8 +1175,7 @@ function DashboardTab({ isRTL, onNavigate }: { isRTL: boolean; onNavigate?: (tab
   }
   activityItems.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
-  // Custom chart tooltip
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string; color: string }>; label?: string }) => {
+  /*
     if (!active || !payload?.length) return null;
     return (
       <div className="bg-background border border-border rounded-lg px-3 py-2 shadow-lg text-xs">
@@ -1163,7 +1193,7 @@ function DashboardTab({ isRTL, onNavigate }: { isRTL: boolean; onNavigate?: (tab
         ))}
       </div>
     );
-  };
+  */
 
   return (
     <div className="space-y-5">
@@ -1292,8 +1322,8 @@ function DashboardTab({ isRTL, onNavigate }: { isRTL: boolean; onNavigate?: (tab
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.7 0 0 / 0.1)" />
                   <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="oklch(0.5 0 0 / 0.3)" />
-                  <YAxis tick={{ fontSize: 10 }} stroke="oklch(0.5 0 0 / 0.3)" tickFormatter={(v: number) => isRTL ? toPersianDigits(v >= 1000000 ? `${(v / 1000000).toFixed(0)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v) : (v >= 1000000 ? `${(v / 1000000).toFixed(0)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v)} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <YAxis tick={{ fontSize: 10 }} stroke="oklch(0.5 0 0 / 0.3)" tickFormatter={(v: number) => String(isRTL ? toPersianDigits(v >= 1000000 ? `${(v / 1000000).toFixed(0)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v) : (v >= 1000000 ? `${(v / 1000000).toFixed(0)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v))} />
+                  <Tooltip content={<SuperAdminChartTooltip isRTL={isRTL} />} />
                   <Area type="monotone" dataKey="revenue" name={isRTL ? "درآمد (تومان)" : "Revenue (Toman)"} stroke="#d97706" fill="url(#revenueGradient)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -1320,8 +1350,8 @@ function DashboardTab({ isRTL, onNavigate }: { isRTL: boolean; onNavigate?: (tab
                 <LineChart data={enrollmentTrendData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.7 0 0 / 0.1)" />
                   <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="oklch(0.5 0 0 / 0.3)" />
-                  <YAxis tick={{ fontSize: 10 }} stroke="oklch(0.5 0 0 / 0.3)" tickFormatter={(v: number) => isRTL ? toPersianDigits(v) : v} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <YAxis tick={{ fontSize: 10 }} stroke="oklch(0.5 0 0 / 0.3)" tickFormatter={(v: number) => String(isRTL ? toPersianDigits(v) : v)} />
+                  <Tooltip content={<SuperAdminChartTooltip isRTL={isRTL} />} />
                   <Line type="monotone" dataKey="enrollments" name={isRTL ? "ثبت‌نام‌ها" : "Enrollments"} stroke="#7c3aed" strokeWidth={2.5} dot={{ r: 3, fill: "#7c3aed" }} activeDot={{ r: 5, fill: "#7c3aed" }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -1356,7 +1386,7 @@ function DashboardTab({ isRTL, onNavigate }: { isRTL: boolean; onNavigate?: (tab
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<SuperAdminChartTooltip isRTL={isRTL} />} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -1391,7 +1421,7 @@ function DashboardTab({ isRTL, onNavigate }: { isRTL: boolean; onNavigate?: (tab
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<SuperAdminChartTooltip isRTL={isRTL} />} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -1487,9 +1517,9 @@ function DashboardTab({ isRTL, onNavigate }: { isRTL: boolean; onNavigate?: (tab
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={referralBarData} layout="vertical" margin={{ top: 0, right: 0, bottom: 0, left: isRTL ? 0 : 80 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="oklch(0.7 0 0 / 0.1)" />
-                  <XAxis type="number" tick={{ fontSize: 10 }} stroke="oklch(0.5 0 0 / 0.3)" tickFormatter={(v: number) => isRTL ? toPersianDigits(v) : v} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} stroke="oklch(0.5 0 0 / 0.3)" tickFormatter={(v: number) => String(isRTL ? toPersianDigits(v) : v)} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} stroke="oklch(0.5 0 0 / 0.3)" />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={<SuperAdminChartTooltip isRTL={isRTL} />} />
                   <Bar dataKey="count" name={isRTL ? "تعداد" : "Count"} fill="#d97706" radius={[0, 6, 6, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
@@ -1847,7 +1877,7 @@ function UsersTab({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL, roleFilter, debouncedSearch]);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => { deferEffect(fetchUsers); }, [fetchUsers]);
 
   const fetchDetail = async (id: string) => {
     try {
@@ -2601,7 +2631,7 @@ function BlogSection({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { deferEffect(fetchData); }, [fetchData]);
 
   const deleteItem = async (id: string) => {
     try {
@@ -2749,12 +2779,14 @@ function BlogEditDialog({ open, onOpenChange, item, isRTL, onSaved, mode = "edit
   // Fetch categories on dialog open
   useEffect(() => {
     if (open) {
-      setCategoriesLoading(true);
-      authFetch("/api/blog-categories?all=true")
+      deferEffect(() => {
+        setCategoriesLoading(true);
+        authFetch("/api/blog-categories?all=true")
         .then((res) => res.ok ? res.json() : [])
         .then((data) => setAllCategories(Array.isArray(data) ? data : []))
         .catch(() => setAllCategories([]))
         .finally(() => setCategoriesLoading(false));
+      });
     }
   }, [open]);
 
@@ -2762,9 +2794,10 @@ function BlogEditDialog({ open, onOpenChange, item, isRTL, onSaved, mode = "edit
   useEffect(() => {
     if (!open) return;
     // Reset slug manual-edit tracking
-    setSlugFaManuallyEdited(false);
-    setSlugEnManuallyEdited(false);
-    if (isCreate) {
+    deferEffect(() => {
+      setSlugFaManuallyEdited(false);
+      setSlugEnManuallyEdited(false);
+      if (isCreate) {
       setForm({
         titleFa: "", titleEn: "", slugFa: "", slugEn: "",
         excerptFa: "", excerptEn: "", contentFa: "", contentEn: "",
@@ -2794,7 +2827,8 @@ function BlogEditDialog({ open, onOpenChange, item, isRTL, onSaved, mode = "edit
       } else {
         setCategoryIds([]);
       }
-    }
+      }
+    });
   }, [item, open, isCreate]);
 
   const updateField = (field: string, value: string | boolean) => {
@@ -3089,7 +3123,7 @@ function WorkshopSection({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { deferEffect(fetchData); }, [fetchData]);
 
   const deleteItem = async (id: string) => {
     try {
@@ -3250,7 +3284,7 @@ function AnnouncementSection({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { deferEffect(fetchData); }, [fetchData]);
 
   const deleteItem = async (id: string) => {
     try {
@@ -3410,7 +3444,7 @@ function AdminsTab({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchAdmins(); }, [fetchAdmins]);
+  useEffect(() => { deferEffect(fetchAdmins); }, [fetchAdmins]);
 
   const toggleActive = async (id: string, isActive: boolean) => {
     try {
@@ -4110,7 +4144,7 @@ function TestimonialsTab({ isRTL }: { isRTL: boolean }) {
     }
   }, [isRTL, filter]);
 
-  useEffect(() => { fetchTestimonials(); }, [fetchTestimonials]);
+  useEffect(() => { deferEffect(fetchTestimonials); }, [fetchTestimonials]);
 
   const handleAction = async (id: string, action: string, extra?: Record<string, unknown>) => {
     try {
@@ -4628,7 +4662,7 @@ function ContactMessagesSubTab({ isRTL }: { isRTL: boolean }) {
     }
   }, [isRTL, filter]);
 
-  useEffect(() => { fetchMessages(); }, [fetchMessages]);
+  useEffect(() => { deferEffect(fetchMessages); }, [fetchMessages]);
 
   const toggleRead = async (id: string, isRead: boolean) => {
     try {
@@ -4767,7 +4801,7 @@ function InternalMessagesSubTab({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL, filter]);
 
-  useEffect(() => { fetchMessages(); }, [fetchMessages]);
+  useEffect(() => { deferEffect(fetchMessages); }, [fetchMessages]);
 
   const markRead = async (id: string) => {
     try {
@@ -4907,7 +4941,7 @@ function DevicesSection({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchDevices(); }, [fetchDevices]);
+  useEffect(() => { deferEffect(fetchDevices); }, [fetchDevices]);
 
   const approve = async (id: string, isApproved: boolean) => {
     try {
@@ -4975,7 +5009,7 @@ function IntrusionSection({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
+  useEffect(() => { deferEffect(fetchAlerts); }, [fetchAlerts]);
 
   const resolve = async (id: string) => {
     try {
@@ -5033,7 +5067,7 @@ function SessionsSection({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchSessions(); }, [fetchSessions]);
+  useEffect(() => { deferEffect(fetchSessions); }, [fetchSessions]);
 
   if (loading) return <Spinner />;
 
@@ -5082,7 +5116,7 @@ function BackupsTab({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchBackups(); }, [fetchBackups]);
+  useEffect(() => { deferEffect(fetchBackups); }, [fetchBackups]);
 
   const createBackup = async () => {
     setCreating(true);
@@ -5152,7 +5186,7 @@ function AnalyticsTab({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { deferEffect(fetchData); }, [fetchData]);
 
   if (loading) return <Spinner />;
   if (!data) return null;
@@ -5303,7 +5337,7 @@ function AuditLogsTab({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL, severity, entity]);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  useEffect(() => { deferEffect(fetchLogs); }, [fetchLogs]);
 
   return (
     <div className="space-y-4">
@@ -5369,7 +5403,7 @@ function SettingsTab({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+  useEffect(() => { deferEffect(fetchSettings); }, [fetchSettings]);
 
   const updateSetting = async (id: string, value: string) => {
     try {
@@ -6090,7 +6124,12 @@ function CoursesTab({ isRTL }: { isRTL: boolean }) {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { fetchCourses(); fetchInstructors(); }, [fetchCourses, fetchInstructors]);
+  useEffect(() => {
+    deferEffect(() => {
+      fetchCourses();
+      fetchInstructors();
+    });
+  }, [fetchCourses, fetchInstructors]);
 
   const deleteCourse = async (id: string) => {
     try {
@@ -6694,7 +6733,12 @@ function ClassSchedulesTab({ isRTL }: { isRTL: boolean }) {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { fetchData(); fetchFilters(); }, [fetchData, fetchFilters]);
+  useEffect(() => {
+    deferEffect(() => {
+      fetchData();
+      fetchFilters();
+    });
+  }, [fetchData, fetchFilters]);
 
   const handleCancel = async () => {
     if (!cancelTarget || !cancelReason.trim()) return;
@@ -7065,7 +7109,7 @@ function ScheduleRequestsTab({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL, statusFilter, typeFilter]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { deferEffect(fetchData); }, [fetchData]);
 
   const handleApprove = async () => {
     if (!reviewTarget) return;
@@ -7339,7 +7383,12 @@ function WorkshopTicketsTab({ isRTL }: { isRTL: boolean }) {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { fetchTickets(); fetchWorkshops(); }, [fetchTickets, fetchWorkshops]);
+  useEffect(() => {
+    deferEffect(() => {
+      fetchTickets();
+      fetchWorkshops();
+    });
+  }, [fetchTickets, fetchWorkshops]);
 
   const changeTicketStatus = async (id: string, newStatus: string) => {
     try {
@@ -7616,7 +7665,7 @@ function PendingRegistrationsTab({ isRTL }: { isRTL: boolean }) {
     }
   }, [isRTL, debouncedSearch, statusFilter]);
 
-  useEffect(() => { fetchRegistrations(); }, [fetchRegistrations]);
+  useEffect(() => { deferEffect(fetchRegistrations); }, [fetchRegistrations]);
 
   // Auto-refresh every 60 seconds
   useEffect(() => {
@@ -8225,8 +8274,8 @@ function RegistrationsTab({ isRTL }: { isRTL: boolean }) {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { fetchEnrollments(); }, [fetchEnrollments]);
-  useEffect(() => { fetchCourses(); }, [fetchCourses]);
+  useEffect(() => { deferEffect(fetchEnrollments); }, [fetchEnrollments]);
+  useEffect(() => { deferEffect(fetchCourses); }, [fetchCourses]);
 
   // Polling for new registrations every 45 seconds
   useEffect(() => {
@@ -8498,7 +8547,7 @@ function InstructorsTab({ isRTL }: { isRTL: boolean }) {
     finally { setLoading(false); }
   }, [isRTL, debouncedSearch]);
 
-  useEffect(() => { fetchInstructors(); }, [fetchInstructors]);
+  useEffect(() => { deferEffect(fetchInstructors); }, [fetchInstructors]);
 
   return (
     <div className="space-y-4">
@@ -8676,8 +8725,10 @@ function FinancialTab({ isRTL }: { isRTL: boolean }) {
   }, [isRTL, tuitionFilter]);
 
   useEffect(() => {
-    if (subView === "payments") fetchPayments();
-    else fetchEnrollments();
+    deferEffect(() => {
+      if (subView === "payments") fetchPayments();
+      else fetchEnrollments();
+    });
   }, [subView, fetchPayments, fetchEnrollments]);
 
   // Silent auto-refresh every 60s
@@ -9263,8 +9314,10 @@ function CreatePaymentDialog({
   // When enrollment selected, pre-fill amount / totalAmount from tuition
   useEffect(() => {
     if (selectedEnrollment?.tuitionAmount) {
-      setAmount(String(selectedEnrollment.tuitionAmount));
-      setTotalAmount(String(selectedEnrollment.tuitionAmount));
+      deferEffect(() => {
+        setAmount(String(selectedEnrollment.tuitionAmount));
+        setTotalAmount(String(selectedEnrollment.tuitionAmount));
+      });
     }
   }, [selectedEnrollment]);
 

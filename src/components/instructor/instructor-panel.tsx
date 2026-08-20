@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
 import { useAuthStore, authFetch } from "@/lib/auth/store";
 import { cn } from "@/lib/utils";
 import { toPersianDigits, formatJalaaliDate } from "@/lib/jalali";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { uniqueById } from "@/lib/instructor/collection-contract";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -395,6 +397,108 @@ function EmptyState({ icon: Icon, title, subtitle, isRTL }: { icon: React.Compon
       </div>
       <p className="text-sm font-semibold text-muted-foreground">{title}</p>
       {subtitle && <p className="text-xs text-muted-foreground/60 mt-1">{subtitle}</p>}
+    </div>
+  );
+}
+
+function InstructorProfileTab({ isRTL }: { isRTL: boolean }) {
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const loadProfile = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await authFetch("/api/student/profile");
+      if (!response.ok) throw new Error("Failed to load profile");
+      const data = await response.json();
+      setProfile(data.profile || null);
+    } catch {
+      toast.error(isRTL ? "خطا در بارگذاری پروفایل" : "Failed to load profile");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isRTL]);
+
+  useEffect(() => {
+    deferEffect(loadProfile);
+  }, [loadProfile]);
+
+  const updateField = (field: string, value: string) => {
+    setProfile((current) => (current ? { ...current, [field]: value } : current));
+  };
+
+  const saveProfile = async () => {
+    if (!profile) return;
+    setIsSaving(true);
+    try {
+      const response = await authFetch("/api/student/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: profile.name,
+          phone: profile.phone,
+          primaryInstrument: profile.primaryInstrument,
+          skillLevel: profile.skillLevel,
+          city: profile.city,
+          experience: profile.experience,
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to save profile");
+      const data = await response.json();
+      setProfile(data.profile || profile);
+      toast.success(isRTL ? "پروفایل ذخیره شد" : "Profile saved");
+    } catch {
+      toast.error(isRTL ? "ذخیره پروفایل انجام نشد" : "Could not save profile");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) return <PanelSkeleton />;
+  if (!profile) return <EmptyState icon={User} title={isRTL ? "پروفایل یافت نشد" : "Profile not found"} isRTL={isRTL} />;
+
+  const fields = [
+    { key: "name", labelFa: "نام و نام خانوادگی", labelEn: "Full name" },
+    { key: "phone", labelFa: "شماره تماس", labelEn: "Phone" },
+    { key: "primaryInstrument", labelFa: "ساز اصلی", labelEn: "Primary instrument" },
+    { key: "skillLevel", labelFa: "سطح مهارت", labelEn: "Skill level" },
+    { key: "city", labelFa: "شهر", labelEn: "City" },
+    { key: "experience", labelFa: "سابقه تدریس", labelEn: "Teaching experience" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-primary/15 bg-gradient-to-br from-primary/[0.04] to-transparent">
+        <CardContent className="p-5">
+          <div className={cn("flex items-center gap-3 mb-5", isRTL && "flex-row-reverse")}>
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <User className="w-5 h-5 text-primary" />
+            </div>
+            <div className={cn("min-w-0", isRTL && "text-right")}>
+              <h2 className="text-base font-bold">{isRTL ? "پروفایل مدرس" : "Instructor Profile"}</h2>
+              <p className="text-xs text-muted-foreground truncate">{String(profile.email || "")}</p>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {fields.map((field) => (
+              <div key={field.key} className="space-y-1.5">
+                <Label>{isRTL ? field.labelFa : field.labelEn}</Label>
+                <Input
+                  value={String(profile[field.key] ?? "")}
+                  onChange={(event) => updateField(field.key, event.target.value)}
+                  className="rounded-xl"
+                  dir={isRTL ? "rtl" : "ltr"}
+                />
+              </div>
+            ))}
+          </div>
+          <Button onClick={saveProfile} disabled={isSaving} className="mt-5 rounded-xl gap-2">
+            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isRTL ? "ذخیره تغییرات" : "Save changes"}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1958,9 +2062,10 @@ function MakeupClassTab({
 // ============================================
 // Main Instructor Panel
 // ============================================
-export default function InstructorPanel() {
+export default function InstructorPanel({ routeOwned = false }: { routeOwned?: boolean }) {
   const { isRTL } = useI18n();
   const { user, showInstructorPanel, setShowInstructorPanel, logout } = useAuthStore();
+  const panelVisible = routeOwned || showInstructorPanel;
   const [activeTab, setActiveTab] = useState("dashboard");
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [requests, setRequests] = useState<ScheduleRequestItem[]>([]);
@@ -2013,29 +2118,29 @@ export default function InstructorPanel() {
 
       if (scheduleRes.status === "fulfilled" && scheduleRes.value.ok) {
         const data = await scheduleRes.value.json();
-        setSchedules(data.schedules || []);
+        setSchedules(uniqueById(Array.isArray(data.schedules) ? data.schedules : []));
       }
 
       if (requestsRes.status === "fulfilled" && requestsRes.value.ok) {
         const data = await requestsRes.value.json();
-        setRequests(data.requests || []);
+        setRequests(uniqueById(Array.isArray(data.requests) ? data.requests : []));
         setRequestStats(data.stats || { pending: 0, approved: 0, rejected: 0 });
       }
 
       if (exercisesRes.status === "fulfilled" && exercisesRes.value.ok) {
         const data = await exercisesRes.value.json();
-        setExercises(data.exercises || []);
+        setExercises(uniqueById(Array.isArray(data.exercises) ? data.exercises : []));
       }
 
       if (submissionsRes.status === "fulfilled" && submissionsRes.value.ok) {
         const data = await submissionsRes.value.json();
-        setSubmissions(data.submissions || []);
+        setSubmissions(uniqueById(Array.isArray(data.submissions) ? data.submissions : []));
         setSubmissionStats(data.stats || { pending: 0, graded: 0 });
       }
 
       if (announcementsRes.status === "fulfilled" && announcementsRes.value.ok) {
         const data = await announcementsRes.value.json();
-        setAnnouncements(data.announcements || []);
+        setAnnouncements(uniqueById(Array.isArray(data.announcements) ? data.announcements : []));
       }
 
       if (dashboardRes.status === "fulfilled" && dashboardRes.value.ok) {
@@ -2056,7 +2161,7 @@ export default function InstructorPanel() {
       const res = await authFetch("/api/instructor/submissions");
       if (res.ok) {
         const data = await res.json();
-        setSubmissions(data.submissions || []);
+        setSubmissions(uniqueById(Array.isArray(data.submissions) ? data.submissions : []));
         setSubmissionStats(data.stats || { pending: 0, graded: 0 });
       }
     } catch (error) {
@@ -2065,16 +2170,16 @@ export default function InstructorPanel() {
   }, []);
 
   useEffect(() => {
-    if (!showInstructorPanel) return;
-    loadData();
-  }, [showInstructorPanel, loadData]);
+    if (!panelVisible) return;
+    deferEffect(loadData);
+  }, [panelVisible, loadData]);
 
   // Load all submissions when submissions tab is active
   useEffect(() => {
-    if (showInstructorPanel && activeTab === "submissions") {
-      loadAllSubmissions();
+    if (panelVisible && activeTab === "submissions") {
+      deferEffect(loadAllSubmissions);
     }
-  }, [showInstructorPanel, activeTab, loadAllSubmissions]);
+  }, [panelVisible, activeTab, loadAllSubmissions]);
 
   // Handlers
   const handleCreateRequest = useCallback(async () => {
@@ -2264,6 +2369,7 @@ export default function InstructorPanel() {
 
   // Tab config
   const tabs = [
+    { id: "profile", icon: User, labelFa: "پروفایل", labelEn: "Profile" },
     { id: "dashboard", icon: LayoutDashboard, labelFa: "داشبورد", labelEn: "Dashboard" },
     { id: "schedule", icon: CalendarDays, labelFa: "برنامه هفتگی", labelEn: "Schedule" },
     { id: "classes", icon: BookOpen, labelFa: "کلاس‌ها", labelEn: "Classes" },
@@ -2274,15 +2380,15 @@ export default function InstructorPanel() {
     { id: "announcements", icon: Megaphone, labelFa: "اطلاعیه‌ها", labelEn: "Announcements" },
   ];
 
-  if (!showInstructorPanel || user?.role !== "instructor") return null;
+  if (!panelVisible || user?.role !== "instructor") return null;
 
   return (
-    <AnimatePresence>
+    <>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-background"
+        className={routeOwned ? "h-full min-h-0 w-full bg-background" : "fixed inset-0 z-50 bg-background"}
       >
         <div className="h-full flex flex-col" dir={isRTL ? "rtl" : "ltr"}>
           {/* Top Bar */}
@@ -2381,6 +2487,7 @@ export default function InstructorPanel() {
                         onNavigateToTab={handleNavigateToTab}
                       />
                     )}
+                    {activeTab === "profile" && <InstructorProfileTab isRTL={isRTL} />}
                     {activeTab === "schedule" && (
                       <ScheduleTab
                         schedules={schedules}
@@ -2705,6 +2812,6 @@ export default function InstructorPanel() {
           </div>
         </DialogContent>
       </Dialog>
-    </AnimatePresence>
+    </>
   );
 }

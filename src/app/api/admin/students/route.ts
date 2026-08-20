@@ -7,6 +7,7 @@ import {
   getUserAgent,
 } from "@/lib/auth/session";
 import { hashPassword } from "@/lib/auth/password";
+import { resolveInstrumentProfile } from "@/lib/validation/instruments";
 import { Prisma } from "@prisma/client";
 
 // GET /api/admin/students - List all users (students & instructors) with detailed data
@@ -148,6 +149,28 @@ export async function POST(request: NextRequest) {
       tags,
     } = body;
 
+    if (role !== undefined && role !== "student" && role !== "instructor") {
+      return NextResponse.json({ error: "Invalid user role" }, { status: 400 });
+    }
+
+    const instrumentProfile = resolveInstrumentProfile({
+      registrationInstrument,
+      primaryInstrument,
+      secondaryInstruments,
+    });
+
+    if ((role || "student") === "student" && !instrumentProfile.registrationInstrument) {
+      return NextResponse.json(
+        { error: "Registration instrument is required for students" },
+        { status: 400 },
+      );
+    }
+
+    if (role === "instructor") {
+      const instructorAuth = await requireAdmin(request, "instructors", "create");
+      if (!instructorAuth.ok) return instructorAuth.response;
+    }
+
     if (!name || !email || !password) {
       return NextResponse.json(
         { error: "نام، ایمیل و رمز عبور الزامی است" },
@@ -178,9 +201,9 @@ export async function POST(request: NextRequest) {
       nationalId: nationalId || null,
       educationLevel: educationLevel || null,
       fieldOfStudy: fieldOfStudy || null,
-      registrationInstrument: registrationInstrument || null,
-      primaryInstrument: primaryInstrument || null,
-      secondaryInstruments: secondaryInstruments || null,
+      registrationInstrument: instrumentProfile.registrationInstrument,
+      primaryInstrument: instrumentProfile.primaryInstrument,
+      secondaryInstruments: instrumentProfile.secondaryInstruments,
       musicExperienceYears: musicExperienceYears ? parseInt(String(musicExperienceYears)) : null,
       previousTraining: previousTraining || null,
       musicGenres: musicGenres || null,
@@ -231,7 +254,13 @@ export async function POST(request: NextRequest) {
     });
 
     // Create CourseEnrollment if courseId is provided
-    let enrollment = null;
+    let enrollment: Prisma.CourseEnrollmentGetPayload<{
+      select: {
+        id: true; status: true; registrationMethod: true; tuitionAmount: true;
+        paymentStatus: true; enrolledAt: true;
+        course: { select: { id: true; titleFa: true; titleEn: true } };
+      };
+    }> | null = null;
     if (courseId) {
       const enrollmentData: Record<string, unknown> = {
         studentId: user.id,

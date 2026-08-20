@@ -2,6 +2,7 @@
 import { authFetch } from "@/lib/auth/store";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -273,7 +274,12 @@ export function PaymentsTab({ isRTL }: { isRTL: boolean }) {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { fetchPayments(); fetchStudents(); }, [fetchPayments, fetchStudents]);
+  useEffect(() => {
+    deferEffect(() => {
+      fetchPayments();
+      fetchStudents();
+    });
+  }, [fetchPayments, fetchStudents]);
 
   // Create payment
   const handleCreatePayment = async (data: Record<string, unknown>) => {

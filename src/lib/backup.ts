@@ -2,7 +2,7 @@
  * src/lib/backup.ts — Centralised database backup / restore engine
  * ----------------------------------------------------------------------------
  * Design goals (per Task 7-b audit):
- *   1. **Automatic daily backups** triggered from middleware (fire-and-forget)
+ *   1. **Automatic daily backups** triggered from proxy (fire-and-forget)
  *      whenever the last successful backup is older than 24 h.
  *   2. **Retention policy**: keep the last 30 daily backups + 12 monthly
  *      snapshots (the oldest backup of each calendar month). Older files are
@@ -607,7 +607,7 @@ export async function shouldRunAutomaticBackup(): Promise<boolean> {
 }
 
 /**
- * Main entry point for automatic backups. Safe to call from middleware on every
+ * Main entry point for automatic backups. Safe to call from proxy on every
  * admin request — uses an in-process lock to deduplicate concurrent calls and
  * checks `shouldRunAutomaticBackup()` first.
  *

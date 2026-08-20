@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { getRoleHome, resolveApplicationRole } from "@/lib/application-shell/contract";
 
 export interface User {
   id: string;
@@ -118,6 +119,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
         lastLoginError: null,
       });
+      const role = resolveApplicationRole(data.user);
+      if (role && typeof window !== "undefined") {
+        window.location.assign(getRoleHome(role));
+      }
       return true;
     } catch (error) {
       console.error("[LOGIN_ERROR]", error);
@@ -159,6 +164,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
         lastLoginError: null,
       });
+      const role = resolveApplicationRole(data.user);
+      if (role && typeof window !== "undefined") {
+        window.location.assign(getRoleHome(role));
+      }
       return true;
     } catch (error) {
       console.error("[ADMIN_LOGIN_ERROR]", error);
@@ -194,6 +203,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         showDashboard: true,
         isLoading: false,
       });
+      if (typeof window !== "undefined") {
+        window.location.replace("/student");
+      }
       return true;
     } catch (error) {
       console.error("[REGISTER_ERROR]", error);
@@ -219,6 +231,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         showAdminPanel: false,
         showInstructorPanel: false,
       });
+      if (typeof window !== "undefined" && window.location.pathname !== "/") {
+        window.location.replace("/");
+      }
     }
   },
 

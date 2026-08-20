@@ -98,16 +98,16 @@ export async function GET(request: NextRequest) {
     );
 
     // Calculate summary from enrollment-level data
-    const totalTuition = enrollments.reduce((sum, e) => sum + (e.tuitionAmount || 0), 0);
+    const totalTuition = enrollments.reduce((sum, e) => sum + (e.tuitionAmount ?? e.course.price ?? 0), 0);
     const paidTuition = enrollments
       .filter((e) => e.paymentStatus === "paid")
-      .reduce((sum, e) => sum + (e.tuitionAmount || 0), 0);
+      .reduce((sum, e) => sum + (e.tuitionAmount ?? e.course.price ?? 0), 0);
     const unpaidTuition = enrollments
       .filter((e) => e.paymentStatus === "unpaid")
-      .reduce((sum, e) => sum + (e.tuitionAmount || 0), 0);
+      .reduce((sum, e) => sum + (e.tuitionAmount ?? e.course.price ?? 0), 0);
     const partialTuition = enrollments
       .filter((e) => e.paymentStatus === "partial")
-      .reduce((sum, e) => sum + (e.tuitionAmount || 0), 0);
+      .reduce((sum, e) => sum + (e.tuitionAmount ?? e.course.price ?? 0), 0);
 
     // Also calculate from Payment records
     const totalPaid = payments
@@ -116,7 +116,9 @@ export async function GET(request: NextRequest) {
     const totalOwed = payments
       .filter((p) => p.status === "pending" || p.status === "overdue")
       .reduce((sum, p) => sum + p.amount, 0);
-    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalAmount = payments
+      .filter((p) => p.status !== "refunded" && p.status !== "failed")
+      .reduce((sum, p) => sum + p.amount, 0);
 
     // Find next upcoming installment
     const pendingPayments = payments
@@ -178,7 +180,7 @@ export async function GET(request: NextRequest) {
         courseNameFa: e.course.titleFa,
         courseNameEn: e.course.titleEn,
         classType: e.course.classType,
-        tuitionAmount: e.tuitionAmount || e.course.price || 0,
+        tuitionAmount: e.tuitionAmount ?? e.course.price ?? 0,
         paymentStatus: e.paymentStatus,
         paidAt: e.paidAt,
         paymentRef: e.paymentRef,

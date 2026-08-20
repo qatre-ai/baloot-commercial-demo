@@ -2,6 +2,7 @@
 import { authFetch } from "@/lib/auth/store";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -56,7 +57,7 @@ export function IntrusionAlertsTab() {
     finally { setIsLoading(false); }
   }, [filter, isRTL]);
 
-  useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
+  useEffect(() => { deferEffect(fetchAlerts); }, [fetchAlerts]);
 
   const handleResolve = async (id: string, resolve: boolean) => {
     try {

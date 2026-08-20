@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth/session";
+import { getSession, requireAdmin } from "@/lib/auth/session";
 import {
   transformPostCategories,
   estimateReadingTime,
@@ -96,10 +97,8 @@ export async function PUT(
   context: RouteContext
 ) {
   try {
-    const session = await getSession();
-    if (!session || session.userType !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+    const auth = await requireAdmin(request, "blog", "update");
+    if (!auth.ok) return auth.response;
 
     const { id } = await context.params;
     const body = await request.json();
@@ -149,7 +148,14 @@ export async function PUT(
         ...(updateFields.metaDescriptionEn !== undefined && { metaDescriptionEn: nullIfEmpty(updateFields.metaDescriptionEn) }),
         ...(updateFields.keywords !== undefined && { keywords: nullIfEmpty(updateFields.keywords) }),
         ...(updateFields.authorId !== undefined && { authorId: nullIfEmpty(updateFields.authorId) }),
-        ...(updateFields.isPublished !== undefined && { isPublished: updateFields.isPublished }),
+        ...(updateFields.sourceType !== undefined && {
+          sourceType: updateFields.sourceType === "ai_assisted" ? "ai_assisted" : "manual",
+        }),
+        ...(updateFields.isPublished !== undefined && {
+          isPublished: updateFields.sourceType === "ai_assisted"
+            ? false
+            : updateFields.isPublished,
+        }),
         ...(updateFields.isFeatured !== undefined && { isFeatured: updateFields.isFeatured }),
         ...(updateFields.isShowOnHome !== undefined && { isShowOnHome: updateFields.isShowOnHome }),
         ...(updateFields.isPinned !== undefined && { isPinned: updateFields.isPinned }),
@@ -161,7 +167,7 @@ export async function PUT(
         ...(updateFields.order !== undefined && { order: updateFields.order }),
         readingTime,
         ...(needsPublishedAt && { publishedAt: new Date() }),
-      },
+      } as Prisma.BlogPostUncheckedUpdateInput,
       include: {
         categories: {
           include: {
@@ -259,10 +265,8 @@ export async function DELETE(
   context: RouteContext
 ) {
   try {
-    const session = await getSession();
-    if (!session || session.userType !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+    const auth = await requireAdmin(_request, "blog", "delete");
+    if (!auth.ok) return auth.response;
 
     const { id } = await context.params;
 

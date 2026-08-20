@@ -4,6 +4,22 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useAuthStore, authFetch } from "@/lib/auth/store";
+import {
+  isValidIranianMobile,
+  isValidIranianNationalId,
+  normalizeDigits,
+  normalizeIranianPhone,
+} from "@/lib/validation/identifiers";
+import { resolveInstrumentProfile } from "@/lib/validation/instruments";
+import {
+  getWizardNextStep,
+  getWizardPreviousStep,
+  getWizardProgress,
+  getWizardStepIds,
+  getWizardStepPosition,
+  isWizardFinalStep,
+  type WizardStepId,
+} from "@/lib/registration/wizard";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -180,7 +196,7 @@ interface FormData {
   referralDetail: string;
 }
 
-type StepId = 1 | 2 | 3 | 4 | 5 | 6;
+type StepId = WizardStepId;
 
 interface StepInfo {
   id: StepId;
@@ -777,9 +793,10 @@ export function RegistrationForm({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const stepContentRef = useRef<HTMLDivElement>(null);
 
   const [form, setForm] = useState<FormData>({
-    role: defaultRole,
+    role: isAdminMode ? defaultRole : "student",
     name: "",
     email: "",
     phone: "",
@@ -840,7 +857,37 @@ export function RegistrationForm({
   const showMinorFields = useMemo(() => isMinor(form.dateOfBirth), [form.dateOfBirth]);
 
   const updateField = useCallback(<K extends keyof FormData>(field: K, value: FormData[K]) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [field]: value } as FormData;
+
+      if (field === "registrationInstrument") {
+        const nextRegistrationInstrument = String(value).trim();
+        const currentPrimaryInstrument = prev.primaryInstrument.trim();
+        const shouldUseRegistrationAsPrimary =
+          !currentPrimaryInstrument ||
+          currentPrimaryInstrument === prev.registrationInstrument.trim();
+
+        if (shouldUseRegistrationAsPrimary) {
+          next.primaryInstrument = nextRegistrationInstrument;
+        }
+
+        next.secondaryInstruments = prev.secondaryInstruments.filter(
+          (instrument) =>
+            instrument.toLowerCase() !==
+            nextRegistrationInstrument.toLowerCase(),
+        );
+      }
+
+      if (
+        field === "primaryInstrument" &&
+        typeof value === "string" &&
+        !value.trim()
+      ) {
+        next.primaryInstrument = prev.registrationInstrument;
+      }
+
+      return next;
+    });
     setErrors((prev) => {
       const copy = { ...prev };
       delete copy[field];
@@ -850,6 +897,13 @@ export function RegistrationForm({
 
   const toggleArrayItem = useCallback((field: "secondaryInstruments" | "musicGenres" | "learningGoals" | "teachingInstruments" | "availableDays", value: string) => {
     setForm((prev) => {
+      if (
+        field === "secondaryInstruments" &&
+        value.toLowerCase() === prev.registrationInstrument.trim().toLowerCase()
+      ) {
+        return prev;
+      }
+
       const arr = prev[field] as string[];
       const next = arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
       return { ...prev, [field]: next };
@@ -858,8 +912,8 @@ export function RegistrationForm({
 
   // ─── Validation ──────────────────────────────────────
 
-  const validateStep = useCallback(
-    (step: StepId): boolean => {
+  const getStepErrors = useCallback(
+    (step: StepId): Record<string, string> => {
       const newErrors: Record<string, string> = {};
 
       if (step === 1) {
@@ -869,12 +923,12 @@ export function RegistrationForm({
         }
         if (!form.name.trim()) newErrors.name = isRTL ? "نام الزامی است" : "Name is required";
         if (!form.phone.trim()) newErrors.phone = isRTL ? "شماره موبایل الزامی است" : "Phone is required";
-        else if (!/^09\d{9}$/.test(form.phone.trim()))
+        else if (!isValidIranianMobile(form.phone))
           newErrors.phone = isRTL ? "شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود" : "Phone must be 11 digits starting with 09";
 
         // National ID is required in both modes
         if (!form.nationalId.trim()) newErrors.nationalId = isRTL ? "کد ملی الزامی است" : "National ID is required";
-        else if (!/^\d{10}$/.test(form.nationalId.trim()))
+        else if (!isValidIranianNationalId(form.nationalId))
           newErrors.nationalId = isRTL ? "کد ملی باید ۱۰ رقم باشد" : "National ID must be 10 digits";
 
         // Email is optional in both modes, validate format if provided
@@ -899,40 +953,25 @@ export function RegistrationForm({
         }
       }
 
+      return newErrors;
+    },
+    [form, isRTL, isAdminMode]
+  );
+
+  const validateStep = useCallback(
+    (step: StepId): boolean => {
+      const newErrors = getStepErrors(step);
       setErrors(newErrors);
       return Object.keys(newErrors).length === 0;
     },
-    [form, isRTL, isAdminMode]
+    [getStepErrors]
   );
 
   // ─── Navigation ──────────────────────────────────────
 
   const canGoNext = useMemo(() => {
-    return validateStep(currentStep);
-  }, [currentStep, validateStep]);
-
-  const getNextStep = useCallback((): StepId | null => {
-    if (currentStep === 4 && form.role === "instructor") {
-      return 5; // Always go to instructor step 5
-    }
-    if (currentStep === 4 && form.role === "student" && !showMinorFields) {
-      return 6;
-    }
-    if (currentStep === 5) return 6;
-    if (currentStep === 6) return null;
-    return (currentStep + 1) as StepId;
-  }, [currentStep, form.role, showMinorFields]);
-
-  const getPrevStep = useCallback((): StepId | null => {
-    if (currentStep === 6 && form.role === "instructor") {
-      return 5; // Always go back to instructor step 5
-    }
-    if (currentStep === 6 && form.role === "student" && !showMinorFields) {
-      return 4;
-    }
-    if (currentStep === 1) return null;
-    return (currentStep - 1) as StepId;
-  }, [currentStep, form.role, showMinorFields]);
+    return Object.keys(getStepErrors(currentStep)).length === 0;
+  }, [currentStep, getStepErrors]);
 
   // ─── Submit ──────────────────────────────────────────
 
@@ -959,10 +998,23 @@ export function RegistrationForm({
         if (form.educationLevel) payload.educationLevel = form.educationLevel;
         if (form.fieldOfStudy) payload.fieldOfStudy = form.fieldOfStudy;
 
-        // Step 3
-        if (form.registrationInstrument) payload.registrationInstrument = form.registrationInstrument;
-        if (form.primaryInstrument) payload.primaryInstrument = form.primaryInstrument;
-        if (form.secondaryInstruments.length > 0) payload.secondaryInstruments = JSON.stringify(form.secondaryInstruments);
+        // Step 3: resolve the instrument invariant before sending any payload.
+        const instrumentProfile = resolveInstrumentProfile({
+          registrationInstrument: form.registrationInstrument,
+          primaryInstrument: form.primaryInstrument,
+          secondaryInstruments: form.secondaryInstruments,
+        });
+        if (instrumentProfile.registrationInstrument) {
+          payload.registrationInstrument =
+            instrumentProfile.registrationInstrument;
+        }
+        if (instrumentProfile.primaryInstrument) {
+          payload.primaryInstrument = instrumentProfile.primaryInstrument;
+        }
+        if (instrumentProfile.secondaryInstruments) {
+          payload.secondaryInstruments =
+            instrumentProfile.secondaryInstruments;
+        }
         if (form.musicExperienceYears) payload.musicExperienceYears = parseInt(form.musicExperienceYears, 10);
         if (form.previousTraining) payload.previousTraining = form.previousTraining;
         if (form.musicGenres.length > 0) payload.musicGenres = JSON.stringify(form.musicGenres);
@@ -1107,15 +1159,21 @@ export function RegistrationForm({
 
   // ─── Progress ────────────────────────────────────────
 
-  const totalSteps = useMemo(() => {
-    if (form.role === "student" && !showMinorFields) return 5;
-    return 6;
-  }, [form.role, showMinorFields]);
-
-  const progressPercent = useMemo(() => {
-    const actual = STEPS.findIndex((s) => s.id === currentStep) + 1;
-    return Math.round((actual / totalSteps) * 100);
-  }, [currentStep, totalSteps]);
+  const visibleStepIds = useMemo(
+    () => getWizardStepIds(form.role, showMinorFields),
+    [form.role, showMinorFields],
+  );
+  const totalSteps = visibleStepIds.length;
+  const currentStepPosition = getWizardStepPosition(
+    currentStep,
+    form.role,
+    showMinorFields,
+  );
+  const progressPercent = getWizardProgress(
+    currentStep,
+    form.role,
+    showMinorFields,
+  );
 
   // ─── Slide direction for animation ───────────────────
 
@@ -1131,20 +1189,30 @@ export function RegistrationForm({
 
   const handleNextAnim = useCallback(() => {
     if (!validateStep(currentStep)) return;
-    const next = getNextStep();
+    const next = getWizardNextStep(currentStep, form.role, showMinorFields);
     if (next) {
       setSlideDir("left");
       setCurrentStep(next);
     }
-  }, [currentStep, getNextStep, validateStep]);
+  }, [currentStep, form.role, showMinorFields, validateStep]);
 
   const handlePrevAnim = useCallback(() => {
-    const prev = getPrevStep();
+    const prev = getWizardPreviousStep(currentStep, form.role, showMinorFields);
     if (prev) {
       setSlideDir("right");
       setCurrentStep(prev);
     }
-  }, [getPrevStep]);
+  }, [currentStep, form.role, showMinorFields]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const firstControl = stepContentRef.current?.querySelector<HTMLElement>(
+        "input, select, textarea, button"
+      );
+      firstControl?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [currentStep]);
 
   // ─── Render helpers ──────────────────────────────────
 
@@ -1180,7 +1248,16 @@ export function RegistrationForm({
       case 4:
         return <Step4Location form={form} updateField={updateField} errors={errors} isRTL={isRTL} isAdminMode={isAdminMode} />;
       case 5:
-        return <Step5Additional form={form} updateField={updateField} errors={errors} isRTL={isRTL} showMinorFields={showMinorFields} />;
+        return (
+          <Step5Additional
+            form={form}
+            updateField={updateField}
+            errors={errors}
+            isRTL={isRTL}
+            showMinorFields={showMinorFields}
+            toggleArrayItem={toggleArrayItem}
+          />
+        );
       case 6:
         return <Step6Referral form={form} updateField={updateField} isRTL={isRTL} isAdminMode={isAdminMode} />;
       default:
@@ -1324,10 +1401,10 @@ export function RegistrationForm({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-4xl w-[95vw] max-h-[92vh] p-0 overflow-hidden bg-background/98 backdrop-blur-2xl border-border/50"
+        className="flex flex-col sm:max-w-4xl w-[calc(100%-1rem)] h-[min(92dvh,900px)] max-h-[calc(100dvh-1rem)] min-h-0 p-0 overflow-hidden bg-background/98 backdrop-blur-2xl border-border/50"
       >
         {/* ─── Header ────────────────────────────── */}
-        <div className="relative px-6 pt-5 pb-4 bg-gradient-to-br from-primary/8 via-amber-500/5 to-primary/5 border-b border-border/40">
+        <div className="relative shrink-0 px-6 pt-5 pb-4 bg-gradient-to-br from-primary/8 via-amber-500/5 to-primary/5 border-b border-border/40">
           {/* Decorative notes */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
             <div className="absolute top-3 right-10 text-primary/8 text-3xl">♪</div>
@@ -1363,7 +1440,9 @@ export function RegistrationForm({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                {isRTL ? `مرحله ${currentStep} از ${totalSteps}` : `Step ${currentStep} of ${totalSteps}`}
+                {isRTL
+                  ? `مرحله ${currentStepPosition} از ${totalSteps}`
+                  : `Step ${currentStepPosition} of ${totalSteps}`}
               </span>
               <span>{progressPercent}%</span>
             </div>
@@ -1372,7 +1451,7 @@ export function RegistrationForm({
         </div>
 
         {/* ─── Step Indicators ───────────────────── */}
-        <div className="px-6 py-3 border-b border-border/30">
+        <div className="shrink-0 px-6 py-3 border-b border-border/30">
           <div className={cn("flex items-center gap-1 overflow-x-auto pb-1", isRTL && "flex-row-reverse")}>
             {STEPS.map((step) => {
               if (step.id === 5 && form.role === "student" && !showMinorFields) return null;
@@ -1410,7 +1489,7 @@ export function RegistrationForm({
         </div>
 
         {/* ─── Step Title ────────────────────────── */}
-        <div className="px-6 pt-4 pb-2">
+        <div className="shrink-0 px-6 pt-4 pb-2">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentStep}
@@ -1439,7 +1518,7 @@ export function RegistrationForm({
         </div>
 
         {/* ─── Step Content ──────────────────────── */}
-        <ScrollArea className="max-h-[min(70vh,700px)] px-6">
+        <ScrollArea className="min-h-0 flex-1 h-auto max-h-none px-6 overscroll-contain">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentStep}
@@ -1447,7 +1526,10 @@ export function RegistrationForm({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: slideDir === "left" ? (isRTL ? 30 : -30) : isRTL ? -30 : 30 }}
               transition={{ duration: 0.25, ease: "easeInOut" }}
-              className="pb-4"
+              ref={stepContentRef}
+              tabIndex={-1}
+              data-registration-step-content
+              className="pb-4 outline-none"
             >
               {renderStepContent()}
             </motion.div>
@@ -1455,7 +1537,7 @@ export function RegistrationForm({
         </ScrollArea>
 
         {/* ─── Footer ────────────────────────────── */}
-        <div className="px-6 py-4 border-t border-border/40 bg-muted/20">
+        <div className="shrink-0 px-6 py-4 border-t border-border/40 bg-muted/20">
           <div className={cn("flex items-center justify-between gap-3", isRTL && "flex-row-reverse")}>
             <Button
               variant="ghost"
@@ -1468,14 +1550,15 @@ export function RegistrationForm({
             </Button>
 
             <div className="flex items-center gap-1.5">
-              {Array.from({ length: totalSteps }).map((_, i) => (
+              {visibleStepIds.map((stepId) => (
                 <div
-                  key={i}
+                  key={stepId}
                   className={cn(
                     "w-1.5 h-1.5 rounded-full transition-all",
-                    i + 1 === currentStep
+                    stepId === currentStep
                       ? "w-4 bg-primary"
-                      : i + 1 < currentStep
+                      : visibleStepIds.indexOf(stepId) <
+                          visibleStepIds.indexOf(currentStep)
                         ? "bg-primary/40"
                         : "bg-muted"
                   )}
@@ -1483,7 +1566,7 @@ export function RegistrationForm({
               ))}
             </div>
 
-            {currentStep === totalSteps ? (
+            {isWizardFinalStep(currentStep, form.role, showMinorFields) ? (
               <Button
                 onClick={handleSubmit}
                 disabled={isSubmitting || !canGoNext}
@@ -1618,8 +1701,7 @@ function Step1Account({
         </div>
       )}
 
-      {/* Role Selection */}
-      <div className="space-y-2">
+      {isAdminMode && <div className="space-y-2">
         <Label className="text-sm font-semibold">{isRTL ? "نوع کاربری" : "User Type"} *</Label>
         <div className="grid grid-cols-2 gap-3">
           <Card
@@ -1665,7 +1747,14 @@ function Step1Account({
             </div>
           </Card>
         </div>
-      </div>
+      </div>}
+
+      {!isAdminMode && (
+        <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-primary">
+          <GraduationCap className="h-5 w-5 shrink-0" />
+          <span>{isRTL ? "این فرم برای ثبت‌نام هنرجویان است." : "This public form is for student registration."}</span>
+        </div>
+      )}
 
       {/* Name */}
       <div className="space-y-1.5">
@@ -1695,7 +1784,7 @@ function Step1Account({
           <Input
             value={form.nationalId}
             onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, "");
+              const val = normalizeDigits(e.target.value).replace(/\D/g, "");
               updateField("nationalId", val.slice(0, 10));
             }}
             className={cn("rounded-xl h-11", isRTL ? "pr-10" : "pl-10")}
@@ -1760,9 +1849,7 @@ function Step1Account({
           <Input
             value={form.phone}
             onChange={(e) => {
-              // Only allow digits
-              const val = e.target.value.replace(/\D/g, "");
-              updateField("phone", val.slice(0, 11));
+              updateField("phone", normalizeIranianPhone(e.target.value).slice(0, 11));
             }}
             className={cn("rounded-xl h-11", isRTL ? "pr-10" : "pl-10")}
             placeholder="09121234567"
@@ -1973,10 +2060,12 @@ function Step3Music({ form, updateField, toggleArrayItem, errors, isRTL, isAdmin
       {!isInstructor && (
         <div className="space-y-1.5">
           <LabelWithGuide isRTL={isRTL} isAdminMode={isAdminMode} fieldKey="registrationInstrument" required>
-            {isRTL ? "ساز ثبت‌نام" : "Registration Instrument"}
+            {isRTL ? "ساز ثبت‌نامی" : "Registration Instrument"}
           </LabelWithGuide>
           <p className="text-[11px] text-muted-foreground -mt-1">
-            {isRTL ? "سازی که می‌خواهید یاد بگیرید" : "The instrument you want to learn"}
+            {isRTL
+              ? "سازی که می‌خواهید برای همین دوره یا کلاس با آن ثبت‌نام کنید."
+              : "The instrument you want to register for in this course or class."}
           </p>
           <SmartCombobox
             options={INSTRUMENTS}
@@ -1996,12 +2085,14 @@ function Step3Music({ form, updateField, toggleArrayItem, errors, isRTL, isAdmin
         <LabelWithGuide isRTL={isRTL} isAdminMode={isAdminMode} fieldKey="primaryInstrument">
           {isInstructor
             ? (isRTL ? "ساز اصلی تدریس" : "Primary Teaching Instrument")
-            : (isRTL ? "ساز اصلی" : "Primary Instrument")}
+            : (isRTL ? "ساز اصلی" : "Main Instrument")}
         </LabelWithGuide>
         <p className="text-[11px] text-muted-foreground -mt-1">
           {isInstructor
             ? (isRTL ? "سازی که استاد در آن تخصص و تدریس دارد" : "The instrument the instructor specializes in and teaches")
-            : (isRTL ? "سازی که قبلاً می‌نوازید (در صورت وجود)" : "Instrument you already play (if any)")}
+             : (isRTL
+               ? "ساز اصلی شخصی شما؛ اختیاری است و در صورت خالی‌بودن، ساز ثبت‌نامی به‌عنوان ساز اصلی ثبت می‌شود."
+               : "Your personal main instrument. Optional; if empty, the registration instrument is used as the main instrument.")}
         </p>
         <SmartCombobox
           options={INSTRUMENTS}
@@ -2017,8 +2108,13 @@ function Step3Music({ form, updateField, toggleArrayItem, errors, isRTL, isAdmin
       {!isInstructor && (
       <div className="space-y-2">
         <LabelWithGuide isRTL={isRTL} isAdminMode={isAdminMode} fieldKey="secondaryInstruments">
-          {isRTL ? "سازهای دیگر" : "Secondary Instruments"}
-        </LabelWithGuide>
+           {isRTL ? "سازهای دیگری که می‌نوازید" : "Other Instruments You Play"}
+         </LabelWithGuide>
+         <p className="text-[11px] text-muted-foreground -mt-1">
+           {isRTL
+             ? "در صورت تمایل، سازهای دیگری را که علاوه بر ساز ثبت‌نامی می‌نوازید انتخاب کنید."
+             : "Optional: choose instruments you play in addition to the registration instrument."}
+         </p>
         <div className="flex flex-wrap gap-2">
           {/* ندارد option */}
           <Badge
@@ -2552,9 +2648,13 @@ function Step4Location({ form, updateField, errors, isRTL, isAdminMode }: StepPr
 
 interface Step5Props extends StepProps {
   showMinorFields: boolean;
+  toggleArrayItem: (
+    field: "teachingInstruments" | "availableDays",
+    value: string,
+  ) => void;
 }
 
-function Step5Additional({ form, updateField, errors, isRTL, showMinorFields }: Step5Props) {
+function Step5Additional({ form, updateField, errors, isRTL, showMinorFields, toggleArrayItem }: Step5Props) {
   return (
     <div className="space-y-5">
       {/* Minor Guardian Info */}

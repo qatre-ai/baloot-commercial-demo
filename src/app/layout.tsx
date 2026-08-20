@@ -66,8 +66,8 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
+    icon: "/logo-icon.png",
+    apple: "/logo-icon-256.png",
   },
   manifest: "/manifest.json",
   openGraph: {

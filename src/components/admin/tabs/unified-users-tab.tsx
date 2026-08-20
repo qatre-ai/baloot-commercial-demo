@@ -4,6 +4,7 @@ import { useAdminPermissions } from "@/lib/auth/use-admin-permissions";
 import { AccessDenied } from "@/components/admin/access-denied";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { RegistrationForm } from "@/components/auth/registration-form";
@@ -478,10 +479,12 @@ function StudentsSubTab({ isRTL, role }: { isRTL: boolean; role: "student" | "in
     }
   }, [isRTL, role, debouncedSearch, filterActive, filterVerified, filterInstrument, filterSkillLevel, filterGender, filterAiSegment, filterRegStatus, page]);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => { deferEffect(fetchUsers); }, [fetchUsers]);
 
   // Reset page when filters change
-  useEffect(() => { setPage(0); }, [search, filterActive, filterVerified, filterInstrument, filterSkillLevel, filterGender, filterAiSegment, filterRegStatus]);
+  useEffect(() => {
+    deferEffect(() => setPage(0));
+  }, [search, filterActive, filterVerified, filterInstrument, filterSkillLevel, filterGender, filterAiSegment, filterRegStatus]);
 
   const fetchDetail = async (id: string) => {
     try {
@@ -1394,7 +1397,7 @@ function AdminsSubTab({ isRTL }: { isRTL: boolean }) {
     }
   }, [isRTL]);
 
-  useEffect(() => { fetchAdmins(); }, [fetchAdmins]);
+  useEffect(() => { deferEffect(fetchAdmins); }, [fetchAdmins]);
 
   const filteredAdmins = admins.filter((a) =>
     !search || a.name.toLowerCase().includes(search.toLowerCase()) || a.email.toLowerCase().includes(search.toLowerCase()) || (a.phone && a.phone.includes(search))

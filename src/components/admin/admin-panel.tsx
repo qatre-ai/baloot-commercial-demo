@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
 import { useAuthStore, authFetch } from "@/lib/auth/store";
 import { toast } from "sonner";
@@ -150,6 +151,7 @@ interface BlogPost {
   metaDescriptionFa: string | null;
   metaDescriptionEn: string | null;
   keywords: string | null;
+  sourceType?: string;
   isPublished: boolean;
   isFeatured: boolean;
   isShowOnHome: boolean;
@@ -1496,6 +1498,10 @@ function BlogPostForm({
   categories: BlogCategory[];
 }) {
   const [formTab, setFormTab] = useState("basic");
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiInstructions, setAiInstructions] = useState("");
+  const [isGeneratingAiDraft, setIsGeneratingAiDraft] = useState(false);
+  const [aiRequestId, setAiRequestId] = useState<string | null>(null);
   const [slugManuallyEditedFa, setSlugManuallyEditedFa] = useState(!!initialData?.slugFa);
   const [slugManuallyEditedEn, setSlugManuallyEditedEn] = useState(!!initialData?.slugEn);
   const [form, setForm] = useState({
@@ -1517,6 +1523,7 @@ function BlogPostForm({
     metaDescriptionFa: initialData?.metaDescriptionFa || "",
     metaDescriptionEn: initialData?.metaDescriptionEn || "",
     keywords: initialData?.keywords || "",
+    sourceType: initialData?.sourceType || "manual",
     isPublished: initialData?.isPublished ?? false,
     isFeatured: initialData?.isFeatured ?? false,
     isShowOnHome: initialData?.isShowOnHome ?? false,
@@ -1550,6 +1557,7 @@ function BlogPostForm({
       metaDescriptionFa: initialData?.metaDescriptionFa || "",
       metaDescriptionEn: initialData?.metaDescriptionEn || "",
       keywords: initialData?.keywords || "",
+      sourceType: initialData?.sourceType || "manual",
       isPublished: initialData?.isPublished ?? false,
       isFeatured: initialData?.isFeatured ?? false,
       isShowOnHome: initialData?.isShowOnHome ?? false,
@@ -1574,8 +1582,121 @@ function BlogPostForm({
     });
   };
 
+  const generateAiDraft = async () => {
+    if (aiTopic.trim().length < 10) {
+      toast.error(isRTL ? "موضوع باید حداقل ۱۰ کاراکتر باشد" : "Topic must be at least 10 characters");
+      return;
+    }
+
+    setIsGeneratingAiDraft(true);
+    setAiRequestId(null);
+    try {
+      const response = await authFetch("/api/admin/blog/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: aiTopic.trim(),
+          language: "bilingual",
+          tone: "professional",
+          audience: isRTL ? "هنرجویان، والدین و علاقه‌مندان موسیقی در ایران" : "Music students, parents, and Iranian music enthusiasts",
+          instructions: aiInstructions.trim() || undefined,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || (isRTL ? "تولید پیش‌نویس ناموفق بود" : "Draft generation failed"));
+      }
+
+      const draft = payload.draft as {
+        titleFa: string;
+        titleEn: string;
+        excerptFa: string;
+        excerptEn: string;
+        contentFa: string;
+        contentEn: string;
+        metaTitleFa: string;
+        metaTitleEn: string;
+        metaDescriptionFa: string;
+        metaDescriptionEn: string;
+        keywords: string[];
+        tags: string[];
+        suggestedCategorySlugs: string[];
+      };
+      const suggestedCategories = categories
+        .filter((category) =>
+          draft.suggestedCategorySlugs.includes(category.slugFa) ||
+          draft.suggestedCategorySlugs.includes(category.slugEn)
+        )
+        .map((category) => category.id);
+
+      setForm((previous) => ({
+        ...previous,
+        ...draft,
+        slugFa: generateSlugFa(draft.titleFa),
+        slugEn: generateSlugEn(draft.titleEn),
+        keywords: draft.keywords.join(", "),
+        tags: draft.tags.join(", "),
+        categoryIds: suggestedCategories.length ? suggestedCategories : previous.categoryIds,
+        sourceType: "ai_assisted",
+        isPublished: false,
+      }));
+      setSlugManuallyEditedFa(false);
+      setSlugManuallyEditedEn(false);
+      setAiRequestId(payload.requestId || null);
+      setFormTab("content");
+      toast.success(isRTL ? "پیش‌نویس آماده است؛ قبل از ذخیره آن را بازبینی کنید" : "Draft ready. Review it before saving.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : (isRTL ? "خطا در تولید پیش‌نویس" : "Draft generation failed"));
+    } finally {
+      setIsGeneratingAiDraft(false);
+    }
+  };
+
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
+      <Card className="border-primary/20 bg-primary/[0.03]">
+        <CardContent className="p-4 space-y-3">
+          <div className={cn("flex items-start gap-3", isRTL && "flex-row-reverse text-right")}>
+            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold">{isRTL ? "دستیار تحریریه هوشمند" : "AI Editorial Copilot"}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {isRTL
+                  ? "فقط پیش‌نویس قابل ویرایش تولید می‌شود؛ انتشار همیشه نیازمند تأیید انسانی است."
+                  : "Generates an editable draft only. Publishing always requires human approval."}
+              </p>
+            </div>
+          </div>
+          <Input
+            value={aiTopic}
+            onChange={(event) => setAiTopic(event.target.value)}
+            placeholder={isRTL ? "موضوع مقاله، مثال: راهنمای انتخاب ساز برای کودکان" : "Article topic, e.g. choosing an instrument for children"}
+            dir={isRTL ? "rtl" : "ltr"}
+            disabled={isGeneratingAiDraft}
+          />
+          <Textarea
+            value={aiInstructions}
+            onChange={(event) => setAiInstructions(event.target.value)}
+            placeholder={isRTL ? "راهنمای تکمیلی اختیاری، منابع یا نکاتی که باید رعایت شود" : "Optional editorial instructions, sources, or constraints"}
+            rows={2}
+            dir={isRTL ? "rtl" : "ltr"}
+            disabled={isGeneratingAiDraft}
+          />
+          <Button type="button" variant="outline" onClick={generateAiDraft} disabled={isGeneratingAiDraft} className="w-full gap-2">
+            {isGeneratingAiDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {isGeneratingAiDraft
+              ? (isRTL ? "در حال تولید پیش‌نویس..." : "Generating draft...")
+              : (isRTL ? "تولید یا بازتولید پیش‌نویس" : "Generate or regenerate draft")}
+          </Button>
+          {aiRequestId && (
+            <p className="text-[10px] text-muted-foreground font-mono text-center" dir="ltr">
+              Request ID: {aiRequestId}
+            </p>
+          )}
+        </CardContent>
+      </Card>
       <Tabs value={formTab} onValueChange={setFormTab}>
         <TabsList className="w-full grid grid-cols-5">
           <TabsTrigger value="basic" className="text-[10px] sm:text-xs gap-1">
@@ -2449,7 +2570,7 @@ function PendingRegistrationsTab({ isRTL }: { isRTL: boolean }) {
   }, [isRTL, debouncedSearch, statusFilter]);
 
   useEffect(() => {
-    fetchRegistrations();
+    deferEffect(fetchRegistrations);
   }, [fetchRegistrations]);
 
   // Auto-refresh every 60 seconds (silent)
@@ -3197,7 +3318,7 @@ function PendingRegistrationsTab({ isRTL }: { isRTL: boolean }) {
   );
 }
 
-export function AdminPanel() {
+export function AdminPanel({ routeOwned = false }: { routeOwned?: boolean }) {
   const { isRTL } = useI18n();
   const { user, isAuthenticated, logout } = useAuthStore();
 
@@ -3214,7 +3335,7 @@ export function AdminPanel() {
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdminVisible, setIsAdminVisible] = useState(false);
+  const [isAdminVisible, setIsAdminVisible] = useState(routeOwned);
   const [activeTab, setActiveTab] = useState("dashboard");
 
   // Course filters
@@ -3670,8 +3791,8 @@ export function AdminPanel() {
     finally { setIsDashboardLoading(false); }
   }, []);
 
-  useEffect(() => { if (isAdminVisible) fetchTestimonials(); }, [isAdminVisible, fetchTestimonials]);
-  useEffect(() => { if (isAdminVisible) fetchContactMessages(); }, [isAdminVisible, fetchContactMessages]);
+  useEffect(() => { if (isAdminVisible) deferEffect(fetchTestimonials); }, [isAdminVisible, fetchTestimonials]);
+  useEffect(() => { if (isAdminVisible) deferEffect(fetchContactMessages); }, [isAdminVisible, fetchContactMessages]);
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true);
@@ -3680,7 +3801,7 @@ export function AdminPanel() {
   }, [fetchAnnouncements, fetchStudents, fetchWorkshops, fetchBlogPosts, fetchBlogCategories, fetchEnrollments, fetchCourses, fetchInstructors, fetchAdminMessages, fetchRecentRegistrations, fetchClassSchedules, fetchScheduleRequests, fetchTestimonials, fetchContactMessages, fetchDashboard, fetchPendingRegCount]);
 
   useEffect(() => {
-    if (isAdminVisible) fetchAll();
+    if (isAdminVisible) deferEffect(fetchAll);
   }, [isAdminVisible, fetchAll]);
 
   // Polling for new registrations every 30 seconds
@@ -4142,7 +4263,7 @@ export function AdminPanel() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-background flex"
+            className={routeOwned ? "h-full min-h-0 w-full bg-background flex" : "fixed inset-0 z-50 bg-background flex"}
             dir={isRTL ? "rtl" : "ltr"}
           >
             {/* Sidebar */}
@@ -4169,7 +4290,7 @@ export function AdminPanel() {
               </div>
 
               {/* Sidebar Navigation */}
-              <ScrollArea className="flex-1">
+              <ScrollArea className="min-h-0 flex-1">
                 <div className="p-2">
                   {/* Group: Overview */}
                   <div className="px-2 pt-2 pb-1">
@@ -5969,8 +6090,8 @@ export function AdminPanel() {
                               <>
                                 <p className="text-2xl font-bold tabular-nums">{isRTL ? toPersianDigits(card.value) : card.value}</p>
                                 <p className="text-[11px] text-muted-foreground">{isRTL ? card.labelFa : card.labelEn}</p>
-                                {card.amount > 0 && (
-                                  <p className="text-[10px] text-muted-foreground mt-1">{isRTL ? toPersianDigits(card.amount.toLocaleString("fa-IR")) : card.amount.toLocaleString("en-US")} {isRTL ? "تومان" : "Toman"}</p>
+                                {(card.amount ?? 0) > 0 && (
+                                  <p className="text-[10px] text-muted-foreground mt-1">{isRTL ? toPersianDigits((card.amount ?? 0).toLocaleString("fa-IR")) : (card.amount ?? 0).toLocaleString("en-US")} {isRTL ? "تومان" : "Toman"}</p>
                                 )}
                               </>
                             ) : (

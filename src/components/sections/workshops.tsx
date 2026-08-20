@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
-import { useAuthStore } from "@/lib/auth/store";
+import { authFetch, useAuthStore } from "@/lib/auth/store";
 import { cn } from "@/lib/utils";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { SectionReveal } from "@/components/ui/section-reveal";
@@ -138,22 +139,26 @@ function WorkshopDetailModal({ workshop, isOpen, onClose, isRTL }: {
   const [userName, setUserName] = useState("");
   const [userPhone, setUserPhone] = useState("");
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { deferEffect(() => setMounted(true)); }, []);
 
   // Auto-fill user info when logged in
   useEffect(() => {
     if (isAuthenticated && user) {
-      setUserName(user.name || "");
-      setUserPhone(user.phone || "");
+      deferEffect(() => {
+        setUserName(user.name || "");
+        setUserPhone(user.phone || "");
+      });
     }
   }, [isAuthenticated, user]);
 
   // Reset state when workshop changes
   useEffect(() => {
-    setPurchaseResult("idle");
-    setShowReservationForm(false);
-    setReservationNotes("");
-    setErrorMessage("");
+    deferEffect(() => {
+      setPurchaseResult("idle");
+      setShowReservationForm(false);
+      setReservationNotes("");
+      setErrorMessage("");
+    });
   }, [workshop?.id]);
 
   if (!workshop) return null;
@@ -193,7 +198,7 @@ function WorkshopDetailModal({ workshop, isOpen, onClose, isRTL }: {
     setIsPurchasing(true);
     setPurchaseResult("idle");
     try {
-      const res = await fetch(`/api/workshops/${workshop.id}/purchase`, {
+      const res = await authFetch(`/api/workshops/${workshop.id}/purchase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes: reservationNotes }),

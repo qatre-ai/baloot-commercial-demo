@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 import { hashPassword } from "@/lib/auth/password";
 import { createSessionToken, setSessionCookieOnResponse } from "@/lib/auth/session";
+import { resolveInstrumentProfile } from "@/lib/validation/instruments";
 import { Prisma } from "@prisma/client";
 
 // Email format validation
@@ -43,6 +44,11 @@ export async function POST(request: NextRequest) {
     }
 
     const hashedPassword = await hashPassword(password);
+    const instrumentProfile = resolveInstrumentProfile({
+      registrationInstrument: extraFields.registrationInstrument,
+      primaryInstrument: extraFields.primaryInstrument,
+      secondaryInstruments: extraFields.secondaryInstruments,
+    });
 
     // SECURITY: Self-registration is STUDENT-ONLY.
     // Instructor accounts must be created by an admin via /api/admin/students or /api/admin/instructors.
@@ -78,6 +84,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    userData.registrationInstrument = instrumentProfile.registrationInstrument;
+    userData.primaryInstrument = instrumentProfile.primaryInstrument;
+    userData.secondaryInstruments = instrumentProfile.secondaryInstruments;
+
     // Create student and notify admins in a transaction
     const student = await db.$transaction(async (tx) => {
       const newStudent = await tx.student.create({
@@ -101,7 +111,10 @@ export async function POST(request: NextRequest) {
 
       if (admins.length > 0) {
         const studentPhone = newStudent.phone || 'بدون شماره';
-        const instrument = extraFields.registrationInstrument || extraFields.primaryInstrument || 'نامشخص';
+        const instrument =
+          instrumentProfile.registrationInstrument ||
+          instrumentProfile.primaryInstrument ||
+          "نامشخص";
 
         await tx.adminMessage.createMany({
           data: admins.map(admin => ({

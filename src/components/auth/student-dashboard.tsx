@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
 import { useAuthStore, authFetch } from "@/lib/auth/store";
 import { toPersianDigits } from "@/lib/jalali";
@@ -24,7 +25,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import {
+  getRegistrationErrorMessage,
+  getWorkshopAvailability,
+  validateStudentProfile,
+} from "@/lib/student/application-contract";
 import {
   X, User, Mail, Phone, Calendar, Music,
   LogOut, BookOpen, Clock, MapPin, CheckCircle2,
@@ -195,6 +203,10 @@ function paymentStatusConfig(status: string, isRTL: boolean) {
       return { label: isRTL ? "معاف" : "Waived", color: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400" };
     case "pending":
       return { label: isRTL ? "در انتظار" : "Pending", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" };
+    case "failed":
+      return { label: isRTL ? "ناموفق" : "Failed", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" };
+    case "refunded":
+      return { label: isRTL ? "بازگشت داده شده" : "Refunded", color: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400" };
     case "overdue":
       return { label: isRTL ? "سررسید گذشته" : "Overdue", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" };
     default:
@@ -275,12 +287,13 @@ function announcementTypeConfig(type: string, isRTL: boolean) {
 }
 
 // ─── Main Component ────────────────────────────
-export function StudentDashboard() {
+export function StudentDashboard({ routeOwned = false }: { routeOwned?: boolean }) {
   const { isRTL } = useI18n();
   const { user, showDashboard, setShowDashboard, logout } = useAuthStore();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("classes");
   const [mounted, setMounted] = useState(false);
+  const panelVisible = routeOwned || showDashboard;
 
   // Data states
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -299,6 +312,10 @@ export function StudentDashboard() {
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [announcementsLoading, setAnnouncementsLoading] = useState(true);
   const [recommendationsLoading, setRecommendationsLoading] = useState(true);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [workshopReservingId, setWorkshopReservingId] = useState<string | null>(null);
 
   // Registration dialog
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
@@ -380,7 +397,7 @@ export function StudentDashboard() {
   // Expanded course in exercises tab
   const [expandedExerciseCourse, setExpandedExerciseCourse] = useState<string | null>(null);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { deferEffect(() => setMounted(true)); }, []);
 
   // Fetch enrollments
   const fetchEnrollments = useCallback(async () => {
@@ -468,7 +485,10 @@ export function StudentDashboard() {
         const data = await res.json();
         const enrolledIds = new Set(enrollments.map(e => e.courseId));
         const available = (data || []).filter(
-          (c: AvailableCourse) => c.registrationOpen && !enrolledIds.has(c.id)
+          (c: AvailableCourse) =>
+            c.registrationOpen &&
+            !enrolledIds.has(c.id) &&
+            (c.maxCapacity == null || c._count.enrollments < c.maxCapacity)
         );
         setAvailableCourses(available);
       }
@@ -513,23 +533,27 @@ export function StudentDashboard() {
 
   // Initial data fetch
   useEffect(() => {
-    if (showDashboard && user) {
-      fetchEnrollments();
-      fetchSchedule();
-      fetchExercises();
-      fetchFinancialData();
-      fetchAnnouncements();
-      fetchRecommendations();
+    if (panelVisible && user) {
+      deferEffect(() => {
+        fetchEnrollments();
+        fetchSchedule();
+        fetchExercises();
+        fetchFinancialData();
+        fetchAnnouncements();
+        fetchRecommendations();
+      });
     }
-  }, [showDashboard, user, fetchEnrollments, fetchSchedule, fetchExercises, fetchFinancialData, fetchAnnouncements, fetchRecommendations]);
+  }, [panelVisible, user, fetchEnrollments, fetchSchedule, fetchExercises, fetchFinancialData, fetchAnnouncements, fetchRecommendations]);
 
   // When opening registration dialog, fetch available courses
   useEffect(() => {
     if (registerDialogOpen) {
-      fetchAvailableCourses();
-      setRegisterError(null);
-      setRegisterSuccess(false);
-      setSelectedCourseId(null);
+      deferEffect(() => {
+        fetchAvailableCourses();
+        setRegisterError(null);
+        setRegisterSuccess(false);
+        setSelectedCourseId(null);
+      });
     }
   }, [registerDialogOpen, fetchAvailableCourses]);
 
@@ -557,12 +581,89 @@ export function StudentDashboard() {
         fetchSchedule();
       } else {
         const data = await res.json();
-        setRegisterError(data.error || (isRTL ? "خطا در ثبت‌نام" : "Registration failed"));
+        setRegisterError(getRegistrationErrorMessage(data.error));
       }
     } catch {
       setRegisterError(isRTL ? "خطا در ارتباط با سرور" : "Connection error");
     } finally {
       setRegistering(false);
+    }
+  };
+
+  const handleProfileSave = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!studentProfile) return;
+    const formData = new FormData(event.currentTarget);
+    const payload = {
+      name: String(formData.get("name") || ""),
+      phone: String(formData.get("phone") || ""),
+      email: String(studentProfile.email || ""),
+      primaryInstrument: String(formData.get("primaryInstrument") || ""),
+      skillLevel: String(formData.get("skillLevel") || ""),
+      musicExperienceYears: formData.get("musicExperienceYears")
+        ? Number(formData.get("musicExperienceYears"))
+        : null,
+      city: String(formData.get("city") || ""),
+      address: String(formData.get("address") || ""),
+    };
+    const errors = validateStudentProfile(payload);
+    if (Object.keys(errors).length > 0) {
+      setProfileError(errors.name || errors.phone || errors.email || (isRTL ? "اطلاعات پروفایل معتبر نیست" : "Profile data is invalid"));
+      setProfileSaved(false);
+      return;
+    }
+
+    setProfileSaving(true);
+    setProfileError(null);
+    setProfileSaved(false);
+    try {
+      const res = await authFetch("/api/student/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Profile update failed");
+      setStudentProfile(data.profile);
+      setProfileSaved(true);
+      toast({ title: isRTL ? "پروفایل ذخیره شد" : "Profile saved" });
+    } catch (error) {
+      console.error("[STUDENT_PROFILE_SAVE]", error);
+      setProfileError(isRTL ? "ذخیره پروفایل انجام نشد. دوباره تلاش کنید." : "Profile could not be saved. Try again.");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleWorkshopReserve = async (workshopId: string) => {
+    setWorkshopReservingId(workshopId);
+    try {
+      const res = await authFetch(`/api/workshops/${workshopId}/purchase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: isRTL ? "رزرو انجام نشد" : "Reservation failed",
+          description: getRegistrationErrorMessage(data.error),
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: isRTL ? "کارگاه رزرو شد" : "Workshop reserved" });
+      fetchRecommendations();
+      fetchEnrollments();
+    } catch (error) {
+      console.error("[STUDENT_WORKSHOP_RESERVE]", error);
+      toast({
+        title: isRTL ? "خطا" : "Error",
+        description: isRTL ? "ارتباط با سرور برقرار نشد" : "Could not connect to the server",
+        variant: "destructive",
+      });
+    } finally {
+      setWorkshopReservingId(null);
     }
   };
 
@@ -614,6 +715,7 @@ export function StudentDashboard() {
 
   // Tab definitions with icons and notification badges
   const TABS = [
+    { value: "profile", label: isRTL ? "پروفایل" : "Profile", icon: User, badge: null },
     { value: "classes", label: isRTL ? "کلاس‌ها" : "Classes", icon: BookOpen, badge: null },
     { value: "schedule", label: isRTL ? "برنامه" : "Schedule", icon: Calendar, badge: null },
     { value: "financial", label: isRTL ? "مالی" : "Financial", icon: Wallet, badge: null },
@@ -624,16 +726,16 @@ export function StudentDashboard() {
 
   return (
     <AnimatePresence>
-      {showDashboard && (
+      {panelVisible && (
         <>
           {/* Backdrop */}
-          <motion.div
+          {!routeOwned && <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowDashboard(false)}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
-          />
+          />}
 
           {/* Dashboard Panel */}
           <motion.div
@@ -642,9 +744,11 @@ export function StudentDashboard() {
             exit={{ opacity: 0, x: isRTL ? -100 : 100, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className={cn(
-              "fixed inset-y-0 z-50 bg-background/98 backdrop-blur-2xl shadow-2xl flex flex-col",
+              routeOwned
+                ? "h-full min-h-0 w-full bg-background flex flex-col"
+                : "fixed inset-y-0 z-50 bg-background/98 backdrop-blur-2xl shadow-2xl flex flex-col",
               isRTL ? "left-0 border-r border-border/50" : "right-0 border-l border-border/50",
-              "w-full sm:w-[480px]"
+              !routeOwned && "w-full sm:w-[480px]"
             )}
           >
             {/* ─── Header with Profile ──────────── */}
@@ -742,6 +846,61 @@ export function StudentDashboard() {
                 </div>
 
                 {/* ─── Classes Tab ────────────── */}
+                <TabsContent value="profile" className="flex-1 overflow-hidden mt-0">
+                  <ScrollArea className="h-full">
+                    <form onSubmit={handleProfileSave} className="p-4 space-y-4">
+                      <div className={cn("rounded-xl border border-border/40 bg-card/60 p-3", isRTL && "text-right")}>
+                        <p className="text-sm font-semibold">{isRTL ? "اطلاعات حساب" : "Account information"}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {isRTL ? "اطلاعات ثبت‌نام و ارتباط با موسسه را به‌روز نگه دارید." : "Keep your registration and contact information up to date."}
+                        </p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="student-profile-name">{isRTL ? "نام و نام خانوادگی" : "Full name"}</Label>
+                          <Input id="student-profile-name" name="name" defaultValue={String(studentProfile?.name || user.name || "")} required />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="student-profile-phone">{isRTL ? "شماره تماس" : "Phone"}</Label>
+                          <Input id="student-profile-phone" name="phone" defaultValue={String(studentProfile?.phone || user.phone || "")} dir="ltr" required />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="student-profile-instrument">{isRTL ? "ساز اصلی" : "Primary instrument"}</Label>
+                          <Input id="student-profile-instrument" name="primaryInstrument" defaultValue={String(studentProfile?.primaryInstrument || "")} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="student-profile-level">{isRTL ? "سطح مهارت" : "Skill level"}</Label>
+                          <Input id="student-profile-level" name="skillLevel" defaultValue={String(studentProfile?.skillLevel || "")} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="student-profile-experience">{isRTL ? "سابقه موسیقی (سال)" : "Music experience (years)"}</Label>
+                          <Input id="student-profile-experience" name="musicExperienceYears" type="number" min="0" defaultValue={studentProfile?.musicExperienceYears == null ? "" : String(studentProfile.musicExperienceYears)} dir="ltr" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="student-profile-city">{isRTL ? "شهر" : "City"}</Label>
+                          <Input id="student-profile-city" name="city" defaultValue={String(studentProfile?.city || "")} />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="student-profile-address">{isRTL ? "نشانی" : "Address"}</Label>
+                        <Textarea id="student-profile-address" name="address" defaultValue={String(studentProfile?.address || "")} className="min-h-20" />
+                      </div>
+                      {profileError && (
+                        <div role="alert" className={cn("rounded-xl bg-destructive/10 p-3 text-xs text-destructive", isRTL && "text-right")}>{profileError}</div>
+                      )}
+                      {profileSaved && (
+                        <div role="status" className={cn("rounded-xl bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-400", isRTL && "text-right")}>
+                          {isRTL ? "تغییرات با موفقیت ذخیره شد." : "Changes saved successfully."}
+                        </div>
+                      )}
+                      <Button type="submit" disabled={profileSaving} className="w-full rounded-xl gap-2">
+                        {profileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                        {profileSaving ? (isRTL ? "در حال ذخیره..." : "Saving...") : (isRTL ? "ذخیره تغییرات" : "Save changes")}
+                      </Button>
+                    </form>
+                  </ScrollArea>
+                </TabsContent>
+
                 <TabsContent value="classes" className="flex-1 overflow-hidden mt-0">
                   <ScrollArea className="h-full">
                     <div className="p-4 space-y-3">
@@ -1527,6 +1686,14 @@ export function StudentDashboard() {
                               const isFeatured = data.isFeatured as boolean | false;
                               const category = data.category as string | null;
                               const branch = data.branch as { nameFa: string; nameEn: string } | null;
+                              const workshopId = rec.type === "workshop" ? String(data.id || "") : "";
+                              const workshopAvailability = rec.type === "workshop"
+                                ? getWorkshopAvailability({
+                                    registrationOpen: Boolean(data.registrationOpen),
+                                    reservedSeats: Number(data.reservedSeats || 0),
+                                    totalSeats: Number(data.totalSeats || 0),
+                                  })
+                                : null;
 
                               return (
                                 <motion.div
@@ -1586,6 +1753,32 @@ export function StudentDashboard() {
                                               <span className="text-[10px] text-muted-foreground">{category}</span>
                                             )}
                                           </div>
+                                          {rec.type === "workshop" && workshopAvailability && (
+                                            <div className={cn("mt-2 flex items-center justify-between gap-2", isRTL && "flex-row-reverse")}>
+                                              <span className={cn(
+                                                "text-[10px] font-medium",
+                                                workshopAvailability.state === "available" ? "text-emerald-600 dark:text-emerald-400" :
+                                                workshopAvailability.state === "full" ? "text-red-600 dark:text-red-400" :
+                                                "text-muted-foreground"
+                                              )}>
+                                                {workshopAvailability.state === "available"
+                                                  ? (isRTL ? `${toPersianDigits(workshopAvailability.remainingSeats)} ظرفیت باقی‌مانده` : `${workshopAvailability.remainingSeats} seats left`)
+                                                  : workshopAvailability.state === "full"
+                                                  ? (isRTL ? "ظرفیت تکمیل است" : "Fully booked")
+                                                  : (isRTL ? "ثبت‌نام بسته است" : "Registration closed")}
+                                              </span>
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                className="h-7 rounded-lg px-2 text-[10px]"
+                                                disabled={workshopAvailability.state !== "available" || workshopReservingId === workshopId}
+                                                onClick={() => handleWorkshopReserve(workshopId)}
+                                              >
+                                                {workshopReservingId === workshopId && <Loader2 className="me-1 h-3 w-3 animate-spin" />}
+                                                {isRTL ? "رزرو کارگاه" : "Reserve"}
+                                              </Button>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     </CardContent>

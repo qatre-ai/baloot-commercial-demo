@@ -6,19 +6,12 @@ import {
   getClientIp,
   getUserAgent,
 } from "@/lib/auth/session";
+import { RESOURCES, ACTIONS } from "@/lib/auth/permissions";
 
-const ALLOWED_RESOURCES = [
-  "users", "courses", "workshops", "blog", "announcements",
-  "instructors", "branches", "media", "backups", "settings",
-  "messages", "analytics", "enrollments", "payments", "testimonials",
-  "schedules", "contact_messages", "newsletter", "security", "audit_logs",
-  "makeup_class", "admins",
-];
-
-const ALLOWED_ACTIONS = [
-  "create", "read", "update", "delete", "publish", "manage", "feature",
-  "approve", "export", "assign",
-];
+// Derived from the canonical catalog so the API, the seeds and the runtime
+// RBAC checks can never drift apart again.
+const ALLOWED_RESOURCES: readonly string[] = RESOURCES;
+const ALLOWED_ACTIONS: readonly string[] = ACTIONS;
 
 // GET /api/admin/permissions?adminId=xxx - Get permissions for an admin
 export async function GET(request: NextRequest) {

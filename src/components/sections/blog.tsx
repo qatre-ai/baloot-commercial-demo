@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import Image from "next/image";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -860,7 +861,7 @@ export function BlogSection({ onViewAll }: { onViewAll?: () => void } = {}) {
   // Fetch related posts when a post is selected
   useEffect(() => {
     if (!selectedPost || !selectedPost.categories?.[0]?.slugFa) {
-      setRelatedPosts([]);
+      deferEffect(() => setRelatedPosts([]));
       return;
     }
     fetch(`/api/blog?category=${selectedPost.categories[0].slugFa}&pageSize=3`)

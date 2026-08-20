@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
 
 // ─── Internal auto-backup endpoint ─────────────────────────────────────────
 //
-// Called fire-and-forget by src/middleware.ts on every admin request when the
+// Called fire-and-forget by src/proxy.ts on every admin request when the
 // last successful backup is older than 24 h. NOT protected by requireSuperAdmin
 // because the middleware cannot attach an admin session — instead we restrict
 // to loopback origins and require a shared internal secret header.

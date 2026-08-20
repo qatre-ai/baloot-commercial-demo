@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 import { useAuthStore } from "@/lib/auth/store";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import {
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { getRoleHome, resolveApplicationRole } from "@/lib/application-shell/contract";
 
 const navKeys = ["announcements", "about", "courses", "workshops", "blog", "branches", "contact"] as const;
 
@@ -34,12 +36,12 @@ export interface SubPageContext {
 }
 
 export function Header({ subPage }: { subPage?: SubPageContext }) {
+  const router = useRouter();
   const { t, locale, setLocale, isRTL } = useI18n();
   const { theme, setTheme } = useTheme();
   const {
     user, isAuthenticated, showAdminPanel,
-    setShowLoginModal, setShowDashboard, setShowInstructorPanel,
-    setShowAdminPanel, logout, checkSession,
+    setShowLoginModal, logout, checkSession,
   } = useAuthStore();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -82,6 +84,11 @@ export function Header({ subPage }: { subPage?: SubPageContext }) {
   const handleBack = () => {
     setMobileOpen(false);
     subPage?.onBack();
+  };
+
+  const openApplication = () => {
+    const role = resolveApplicationRole(user);
+    if (role) router.push(getRoleHome(role));
   };
 
   // When in sub-page mode, always use solid glass-morphism background
@@ -318,7 +325,7 @@ export function Header({ subPage }: { subPage?: SubPageContext }) {
               <>
                 {isAdminUser && (
                   <Button
-                    onClick={() => setShowAdminPanel(true)}
+                    onClick={openApplication}
                     variant="ghost"
                     className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 transition-all duration-300"
                   >
@@ -333,7 +340,7 @@ export function Header({ subPage }: { subPage?: SubPageContext }) {
 
                 {isInstructorUser && (
                   <Button
-                    onClick={() => setShowInstructorPanel(true)}
+                    onClick={openApplication}
                     variant="ghost"
                     className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-500/10 hover:bg-sky-500/20 transition-all duration-300"
                   >
@@ -344,13 +351,7 @@ export function Header({ subPage }: { subPage?: SubPageContext }) {
 
                 <button
                   onClick={() => {
-                    if (isAdminUser) {
-                      setShowAdminPanel(true);
-                    } else if (isInstructorUser) {
-                      setShowInstructorPanel(true);
-                    } else {
-                      setShowDashboard(true);
-                    }
+                    openApplication();
                   }}
                   className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-all duration-300 group"
                 >
@@ -450,7 +451,7 @@ export function Header({ subPage }: { subPage?: SubPageContext }) {
                       <>
                         {isAdminUser && (
                           <Button
-                            onClick={() => { setShowAdminPanel(true); setMobileOpen(false); }}
+                            onClick={() => { openApplication(); setMobileOpen(false); }}
                             className="w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl gap-2 border border-amber-500/20"
                           >
                             <LayoutDashboard className="w-4 h-4" />
@@ -461,7 +462,7 @@ export function Header({ subPage }: { subPage?: SubPageContext }) {
                         )}
                         {isInstructorUser && (
                           <Button
-                            onClick={() => { setShowInstructorPanel(true); setMobileOpen(false); }}
+                            onClick={() => { openApplication(); setMobileOpen(false); }}
                             variant="outline"
                             className="w-full rounded-xl gap-2 border-sky-500/30 hover:border-sky-500/60 text-sky-600 dark:text-sky-400"
                           >
@@ -471,7 +472,7 @@ export function Header({ subPage }: { subPage?: SubPageContext }) {
                         )}
                         {isStudentUser && (
                           <Button
-                            onClick={() => { setShowDashboard(true); setMobileOpen(false); }}
+                            onClick={() => { openApplication(); setMobileOpen(false); }}
                             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2"
                           >
                             <User className="w-4 h-4" />

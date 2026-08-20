@@ -271,7 +271,7 @@ async function main() {
   // ============================================
   // Submit for exercise 1 (practiced, graded)
   if (createdExercises[0]) {
-    await prisma.exerciseSubmission.upsert({
+    await prisma.studentExercise.upsert({
       where: {
         studentId_exerciseId: { studentId, exerciseId: createdExercises[0].id },
       },
@@ -279,21 +279,18 @@ async function main() {
       create: {
         studentId,
         exerciseId: createdExercises[0].id,
-        fileUrl: "/submissions/rast-maqam-practice.mp3",
-        fileName: "rast-maqam-practice.mp3",
-        note: "تمرین کردم اما در گوشه دلکش مشکل دارم",
         feedback: "خوب بود! روی انتقال به گوشه دلکش بیشتر کار کنید.",
         grade: 78,
         status: "graded",
         submittedAt: daysFromNow(-2),
-        reviewedAt: daysFromNow(-1),
+        gradedAt: daysFromNow(-1),
       },
     });
   }
 
   // Submit for exercise 3 (submitted, not yet reviewed)
   if (createdExercises[2]) {
-    await prisma.exerciseSubmission.upsert({
+    await prisma.studentExercise.upsert({
       where: {
         studentId_exerciseId: { studentId, exerciseId: createdExercises[2].id },
       },
@@ -301,9 +298,6 @@ async function main() {
       create: {
         studentId,
         exerciseId: createdExercises[2].id,
-        fileUrl: "/submissions/solfege-intervals.mp3",
-        fileName: "solfege-intervals.mp3",
-        note: "فاصله‌های سوم بزرگ هنوز کمی سخته",
         status: "submitted",
         submittedAt: new Date(),
       },
@@ -312,7 +306,7 @@ async function main() {
 
   // Submit for exercise 5 (submitted, returned with feedback)
   if (createdExercises[4]) {
-    await prisma.exerciseSubmission.upsert({
+    await prisma.studentExercise.upsert({
       where: {
         studentId_exerciseId: { studentId, exerciseId: createdExercises[4].id },
       },
@@ -320,14 +314,11 @@ async function main() {
       create: {
         studentId,
         exerciseId: createdExercises[4].id,
-        fileUrl: "/submissions/guitar-chords.mp4",
-        fileName: "guitar-chords.mp4",
-        note: "انتقال بین Am و C سخته",
         feedback: "انتقالت خوب پیش میره. تمرین بیشتر روی Am -> Dm.",
         grade: 70,
         status: "returned",
         submittedAt: daysFromNow(-5),
-        reviewedAt: daysFromNow(-3),
+        gradedAt: daysFromNow(-3),
       },
     });
   }

@@ -1,0 +1,338 @@
+﻿
+> nextjs_tailwind_shadcn_ts@0.2.0 qa:inspect
+> cross-env DATABASE_URL=file:../db/qa.db tsx scripts/inspect-qa-environment.ts
+
+{
+  "marker": "QA_PERSISTENT_2026",
+  "databaseUrl": "file:../db/qa.db",
+  "admins": [
+    {
+      "email": "qa.admin@mab.local",
+      "role": "admin",
+      "isActive": true
+    },
+    {
+      "email": "qa.secretary@mab.local",
+      "role": "admin",
+      "isActive": true
+    },
+    {
+      "email": "qa.superadmin@mab.local",
+      "role": "super_admin",
+      "isActive": true
+    }
+  ],
+  "students": [
+    {
+      "email": "qa.approved@mab.local",
+      "role": "student",
+      "registrationStatus": "approved"
+    },
+    {
+      "email": "qa.browser.pending.20260817@mab.local",
+      "role": "student",
+      "registrationStatus": "approved"
+    },
+    {
+      "email": "qa.capacity@mab.local",
+      "role": "student",
+      "registrationStatus": "approved"
+    },
+    {
+      "email": "qa.instructor@mab.local",
+      "role": "instructor",
+      "registrationStatus": "approved"
+    },
+    {
+      "email": "qa.student@mab.local",
+      "role": "student",
+      "registrationStatus": "approved"
+    }
+  ],
+  "courses": [
+    {
+      "classCode": "QA-ALMOST-FULL-2026",
+      "titleEn": "QA Almost-Full Course",
+      "registrationOpen": true,
+      "maxCapacity": 3
+    },
+    {
+      "classCode": "QA-CLOSED-2026",
+      "titleEn": "QA Closed Course",
+      "registrationOpen": false,
+      "maxCapacity": 12
+    },
+    {
+      "classCode": "QA-FULL-CAPACITY-2026",
+      "titleEn": "QA Full-Capacity Course",
+      "registrationOpen": true,
+      "maxCapacity": 1
+    },
+    {
+      "classCode": "QA-GUITAR-BEGINNER-2026",
+      "titleEn": "QA Guitar Beginner",
+      "registrationOpen": true,
+      "maxCapacity": 12
+    },
+    {
+      "classCode": "QA-MUSIC-THEORY-2026",
+      "titleEn": "QA Music Theory",
+      "registrationOpen": true,
+      "maxCapacity": 20
+    },
+    {
+      "classCode": "QA-PIANO-BEGINNER-2026",
+      "titleEn": "QA Piano Beginner",
+      "registrationOpen": true,
+      "maxCapacity": 12
+    }
+  ],
+  "workshops": [
+    {
+      "titleEn": "QA Almost-Full Workshop",
+      "registrationOpen": true,
+      "totalSeats": 3,
+      "reservedSeats": 2
+    },
+    {
+      "titleEn": "QA Closed Workshop",
+      "registrationOpen": false,
+      "totalSeats": 15,
+      "reservedSeats": 0
+    },
+    {
+      "titleEn": "QA Full Workshop",
+      "registrationOpen": true,
+      "totalSeats": 1,
+      "reservedSeats": 1
+    },
+    {
+      "titleEn": "QA Music Workshop",
+      "registrationOpen": true,
+      "totalSeats": 20,
+      "reservedSeats": 1
+    }
+  ],
+  "registrations": [
+    {
+      "id": "qa-registration-pending-2026",
+      "email": "qa.pending.registration@mab.local",
+      "status": "pending",
+      "rejectionReason": null,
+      "createdUserId": null
+    },
+    {
+      "id": "qa-registration-approved-2026",
+      "email": "qa.approved.registration@mab.local",
+      "status": "approved",
+      "rejectionReason": null,
+      "createdUserId": "qa-approved-student-2026"
+    },
+    {
+      "id": "qa-registration-rejected-2026",
+      "email": "qa.rejected.registration@mab.local",
+      "status": "rejected",
+      "rejectionReason": "QA_PERSISTENT_2026 rejection fixture",
+      "createdUserId": null
+    },
+    {
+      "id": "qa-registration-inspection-pending-2026",
+      "email": "qa.inspection.pending@mab.local",
+      "status": "pending",
+      "rejectionReason": null,
+      "createdUserId": null
+    }
+  ],
+  "registrationStatuses": [
+    {
+      "_count": {
+        "_all": 1
+      },
+      "status": "approved"
+    },
+    {
+      "_count": {
+        "_all": 2
+      },
+      "status": "pending"
+    },
+    {
+      "_count": {
+        "_all": 1
+      },
+      "status": "rejected"
+    }
+  ],
+  "payments": [
+    {
+      "id": "qa-payment-failed-2026",
+      "status": "failed",
+      "paymentType": "full",
+      "amount": 500000
+    },
+    {
+      "id": "qa-payment-paid-2026",
+      "status": "paid",
+      "paymentType": "full",
+      "amount": 4200000
+    },
+    {
+      "id": "qa-payment-partial-2026",
+      "status": "paid",
+      "paymentType": "partial",
+      "amount": 1200000
+    },
+    {
+      "id": "qa-payment-pending-2026",
+      "status": "pending",
+      "paymentType": "installment",
+      "amount": 800000
+    },
+    {
+      "id": "qa-payment-refunded-2026",
+      "status": "refunded",
+      "paymentType": "refund",
+      "amount": 1200000
+    }
+  ],
+  "paymentStatuses": [
+    {
+      "_count": {
+        "_all": 1
+      },
+      "status": "failed"
+    },
+    {
+      "_count": {
+        "_all": 2
+      },
+      "status": "paid"
+    },
+    {
+      "_count": {
+        "_all": 1
+      },
+      "status": "pending"
+    },
+    {
+      "_count": {
+        "_all": 1
+      },
+      "status": "refunded"
+    }
+  ],
+  "schedules": [
+    {
+      "id": "qa-schedule-almost-full-2026",
+      "courseId": "qa-course-almost-full-2026",
+      "instructorId": "qa-instructor-2026",
+      "status": "active",
+      "dayOfWeek": 5
+    },
+    {
+      "id": "qa-schedule-closed-2026",
+      "courseId": "qa-course-closed-2026",
+      "instructorId": "qa-instructor-2026",
+      "status": "active",
+      "dayOfWeek": 1
+    },
+    {
+      "id": "qa-schedule-full-2026",
+      "courseId": "qa-course-full-capacity-2026",
+      "instructorId": "qa-instructor-2026",
+      "status": "active",
+      "dayOfWeek": 6
+    },
+    {
+      "id": "qa-schedule-guitar-2026",
+      "courseId": "qa-course-guitar-beginner-2026",
+      "instructorId": "qa-instructor-2026",
+      "status": "active",
+      "dayOfWeek": 2
+    },
+    {
+      "id": "qa-schedule-piano-2026",
+      "courseId": "qa-course-piano-beginner-2026",
+      "instructorId": "qa-instructor-2026",
+      "status": "active",
+      "dayOfWeek": 0
+    },
+    {
+      "id": "qa-schedule-theory-2026",
+      "courseId": "qa-course-music-theory-2026",
+      "instructorId": "qa-instructor-2026",
+      "status": "active",
+      "dayOfWeek": 4
+    }
+  ],
+  "enrollments": [
+    {
+      "id": "qa-enrollment-active-2026",
+      "status": "active",
+      "paymentStatus": "partial",
+      "progress": 35
+    },
+    {
+      "id": "qa-enrollment-almost-full-a-2026",
+      "status": "active",
+      "paymentStatus": "unpaid",
+      "progress": 10
+    },
+    {
+      "id": "qa-enrollment-almost-full-b-2026",
+      "status": "active",
+      "paymentStatus": "unpaid",
+      "progress": 10
+    },
+    {
+      "id": "qa-enrollment-completed-2026",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "progress": 100
+    },
+    {
+      "id": "qa-enrollment-full-capacity-2026",
+      "status": "active",
+      "paymentStatus": "unpaid",
+      "progress": 10
+    },
+    {
+      "id": "qa-enrollment-paused-2026",
+      "status": "paused",
+      "paymentStatus": "unpaid",
+      "progress": 55
+    }
+  ],
+  "tickets": [
+    {
+      "id": "qa-ticket-almost-full-a-2026",
+      "status": "paid",
+      "amount": 1650000
+    },
+    {
+      "id": "qa-ticket-almost-full-b-2026",
+      "status": "paid",
+      "amount": 1650000
+    },
+    {
+      "id": "qa-ticket-cancelled-2026",
+      "status": "cancelled",
+      "amount": 1200000
+    },
+    {
+      "id": "qa-ticket-paid-2026",
+      "status": "paid",
+      "amount": 1500000
+    }
+  ],
+  "announcements": [
+    {
+      "id": "qa-announcement-student-2026",
+      "titleEn": "Persistent QA Student Announcement",
+      "isPublished": true,
+      "isPinned": true,
+      "expiresAt": "2026-11-18T02:00:00.000Z"
+    }
+  ],
+  "seedAuditCount": 1
+}

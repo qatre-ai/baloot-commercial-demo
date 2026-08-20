@@ -2,6 +2,7 @@
 import { authFetch } from "@/lib/auth/store";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -96,7 +97,12 @@ export function AdminMessagesTab() {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { fetchMessages(); fetchAdmins(); }, [fetchMessages, fetchAdmins]);
+  useEffect(() => {
+    deferEffect(() => {
+      fetchMessages();
+      fetchAdmins();
+    });
+  }, [fetchMessages, fetchAdmins]);
 
   const handleMarkAsRead = async (msg: AdminMessage) => {
     if (msg.status === "read") return;

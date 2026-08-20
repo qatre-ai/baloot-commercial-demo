@@ -63,15 +63,7 @@ export function LoginModal() {
     if (looksLikeAdmin) {
       const adminSuccess = await adminLogin(loginEmail, loginPassword);
       if (adminSuccess) { setIsSubmitting(false); return; }
-      const adminErr = useAuthStore.getState().lastLoginError;
-      const success = await login(loginEmail, loginPassword);
-      if (!success) {
-        // If student login also failed, prefer showing the admin-specific error if we have one
-        // (user with @mab.ir is more likely an admin); otherwise fall back to whatever the
-        // store has, then the generic message.
-        const finalErr = useAuthStore.getState().lastLoginError || adminErr || genericError;
-        setError(finalErr);
-      }
+      setError(useAuthStore.getState().lastLoginError || genericError);
     } else {
       // Try student/instructor login first for regular emails
       const success = await login(loginEmail, loginPassword);
@@ -270,7 +262,7 @@ export function LoginModal() {
                   <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1"><Music className="w-3 h-3" />{isRTL ? "۶ مرحله" : "6 Steps"}</span>
                     <span>•</span>
-                    <span>{isRTL ? "دانشجو / استاد" : "Student / Instructor"}</span>
+                    <span>{isRTL ? "مسیر ثبت‌نام هنرجو" : "Student registration"}</span>
                     <span>•</span>
                     <span>{isRTL ? "پروفایل موسیقی" : "Music Profile"}</span>
                   </div>

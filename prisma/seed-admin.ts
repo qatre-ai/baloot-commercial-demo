@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
+import { permissionsForRole } from "../src/lib/auth/permissions";
 
 async function seedAdmins() {
   console.log("🔐 Seeding Admin accounts...");
@@ -56,11 +57,8 @@ async function seedAdmins() {
   console.log(`  ✅ Regular Admin: ${admin1.email}`);
 
   // Set permissions for regular admin
-  const resources = ["students", "courses", "workshops", "blog", "announcements", "exercises", "schedules", "instructors", "branches", "media"];
-  const actions = ["create", "read", "update", "delete"];
-
-  for (const resource of resources) {
-    for (const action of actions) {
+  const adminPermissions = permissionsForRole(admin1.role);
+  for (const { resource, action } of adminPermissions) {
       await db.adminPermission.upsert({
         where: {
           adminId_resource_action: {
@@ -78,9 +76,8 @@ async function seedAdmins() {
           grantedBy: superAdmin1.id,
         },
       });
-    }
   }
-  console.log(`  ✅ Permissions set for ${admin1.email} (${resources.length * actions.length} permissions)`);
+  console.log(`  ✅ Permissions set for ${admin1.email} (${adminPermissions.length} permissions)`);
 
   // Create sample audit logs
   const sampleLogs = [

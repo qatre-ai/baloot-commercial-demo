@@ -14,16 +14,17 @@ const INTERNAL_AUTO_TOKEN =
 let lastAutoProbeAt = 0;
 const AUTO_PROBE_COOLDOWN_MS = 12_000;
 
-function triggerAutoBackupIfDue(): void {
+function triggerAutoBackupIfDue(requestOrigin: string): void {
   const now = Date.now();
   if (now - lastAutoProbeAt < AUTO_PROBE_COOLDOWN_MS) return;
   lastAutoProbeAt = now;
 
-  // Resolve the origin: in dev we use localhost:3000, in prod we trust the
-  // Host header so the request stays within the same deployment.
+  // Use the incoming request origin so QA/prod ports are respected.
+  const configuredOrigin = process.env.BACKUP_INTERNAL_ORIGIN?.trim();
   const origin =
-    process.env.BACKUP_INTERNAL_ORIGIN ||
-    `http://${process.env.HOST || "localhost"}:${process.env.PORT || "3000"}`;
+    configuredOrigin && configuredOrigin !== "http://localhost:3000"
+      ? configuredOrigin
+      : requestOrigin;
 
   const url = `${origin}/api/admin/backups`;
 
@@ -76,7 +77,7 @@ const securityHeaders = {
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 };
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── Session token injection ─────────────────────────────────
@@ -111,7 +112,7 @@ export function middleware(request: NextRequest) {
       || request.headers.get("x-real-ip")?.trim()
       || "unknown";
 
-    if (!checkRateLimit(ip, 10, 15 * 60 * 1000)) {
+    if (!checkRateLimit(`auth-ip:${ip}`, 30, 15 * 60 * 1000)) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
         { status: 429, headers: { ...securityHeaders, "Retry-After": "900" } }
@@ -139,7 +140,7 @@ export function middleware(request: NextRequest) {
     // recursion (the probe IS a backups route call).
     if (!pathname.startsWith("/api/admin/backups")) {
       try {
-        triggerAutoBackupIfDue();
+        triggerAutoBackupIfDue(request.nextUrl.origin);
       } catch {
         /* never let auto-backup break a user request */
       }

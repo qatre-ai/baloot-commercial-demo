@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { deferEffect } from "@/lib/react/defer-effect"
 import useEmblaCarousel, {
   type UseEmblaCarouselType,
 } from "embla-carousel-react"
@@ -95,7 +96,7 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return
-    onSelect(api)
+    deferEffect(() => onSelect(api))
     api.on("reInit", onSelect)
     api.on("select", onSelect)
 

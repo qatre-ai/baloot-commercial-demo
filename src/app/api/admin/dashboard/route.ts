@@ -70,11 +70,11 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Distributions - wrap in try/catch for safety
-    let instrumentDistribution: Array<{ primaryInstrument: string | null; _count: number }> = [];
-    let referralDistribution: Array<{ referralSource: string | null; _count: number }> = [];
-    let genderDistribution: Array<{ gender: string | null; _count: number }> = [];
-    let enrollmentStats: Array<{ status: string; _count: number }> = [];
-    let dailyLogins: Array<{ userType: string; _count: number }> = [];
+    let instrumentDistribution: Array<{ primaryInstrument: string | null; _count: { primaryInstrument: number } }> = [];
+    let referralDistribution: Array<{ referralSource: string | null; _count: { referralSource: number } }> = [];
+    let genderDistribution: Array<{ gender: string | null; _count: { gender: number } }> = [];
+    let enrollmentStats: Array<{ status: string; _count: { status: number } }> = [];
+    let dailyLogins: Array<{ userType: string; _count: { userType: number } }> = [];
     let upcomingWorkshops: Array<{
       id: string; titleFa: string; titleEn: string; date: Date;
       totalSeats: number; reservedSeats: number; category: string | null; isHot: boolean;
@@ -82,34 +82,50 @@ export async function GET(request: NextRequest) {
     }> = [];
 
     try {
-      instrumentDistribution = await db.student.groupBy({
+      const grouped = await db.student.groupBy({
         by: ["primaryInstrument"],
         _count: true,
         where: { primaryInstrument: { not: null } },
       } as any);
+      instrumentDistribution = grouped.map((item: any) => ({
+        primaryInstrument: item.primaryInstrument,
+        _count: { primaryInstrument: item._count.primaryInstrument ?? item._count._all ?? 0 },
+      }));
     } catch {}
 
     try {
-      referralDistribution = await db.student.groupBy({
+      const grouped = await db.student.groupBy({
         by: ["referralSource"],
         _count: true,
         where: { referralSource: { not: null } },
       } as any);
+      referralDistribution = grouped.map((item: any) => ({
+        referralSource: item.referralSource,
+        _count: { referralSource: item._count.referralSource ?? item._count._all ?? 0 },
+      }));
     } catch {}
 
     try {
-      genderDistribution = await db.student.groupBy({
+      const grouped = await db.student.groupBy({
         by: ["gender"],
         _count: true,
         where: { gender: { not: null } },
       } as any);
+      genderDistribution = grouped.map((item: any) => ({
+        gender: item.gender,
+        _count: { gender: item._count.gender ?? item._count._all ?? 0 },
+      }));
     } catch {}
 
     try {
-      enrollmentStats = await db.courseEnrollment.groupBy({
+      const grouped = await db.courseEnrollment.groupBy({
         by: ["status"],
         _count: true,
       } as any);
+      enrollmentStats = grouped.map((item: any) => ({
+        status: item.status,
+        _count: { status: item._count.status ?? item._count._all ?? 0 },
+      }));
     } catch {}
 
     try {

@@ -2,6 +2,7 @@
 import { authFetch } from "@/lib/auth/store";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -56,7 +57,7 @@ export function AdminDevicesTab() {
     finally { setIsLoading(false); }
   }, [filterAdmin, isRTL]);
 
-  useEffect(() => { fetchDevices(); }, [fetchDevices]);
+  useEffect(() => { deferEffect(fetchDevices); }, [fetchDevices]);
 
   const handleApprove = async (id: string, approve: boolean) => {
     try {

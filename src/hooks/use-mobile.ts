@@ -1,4 +1,5 @@
 import * as React from "react"
+import { deferEffect } from "@/lib/react/defer-effect"
 
 const MOBILE_BREAKPOINT = 768
 
@@ -11,7 +12,7 @@ export function useIsMobile() {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
     }
     mql.addEventListener("change", onChange)
-    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    deferEffect(() => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT))
     return () => mql.removeEventListener("change", onChange)
   }, [])
 

@@ -96,13 +96,13 @@ export function InstructorsSection() {
           className="text-center max-w-2xl mx-auto mb-12 sm:mb-16"
         >
           <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold tracking-wide uppercase mb-4">
-            {t.instructors.tag}
+            {locale === "fa" ? "اساتید ما" : "Our Instructors"}
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-6 leading-tight">
-            {t.instructors.title}
+            {locale === "fa" ? "با بهترین اساتید موسیقی بیاموزید" : "Learn from the best music instructors"}
           </h2>
           <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
-            {t.instructors.description}
+            {locale === "fa" ? "اساتید مجرب ما همراه مسیر رشد هنری شما هستند." : "Our experienced instructors guide your artistic journey."}
           </p>
         </motion.div>
 
@@ -133,7 +133,7 @@ export function InstructorsSection() {
                         {locale === "fa" ? instructor.nameFa : instructor.nameEn}
                       </h3>
                       <Badge variant="secondary" className="text-[10px] mb-2">
-                        {t.instructors.specialty}: {locale === "fa" ? instructor.specialtyFa : instructor.specialtyEn}
+                        {locale === "fa" ? "تخصص" : "Specialty"}: {locale === "fa" ? instructor.specialtyFa : instructor.specialtyEn}
                       </Badge>
                       <p className="text-xs text-muted-foreground">
                         {locale === "fa" ? `تجربه: ${instructor.experience}` : `Experience: ${instructor.experience}`}

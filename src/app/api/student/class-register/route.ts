@@ -194,6 +194,12 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+      if (typeof err === "object" && err !== null && "code" in err && err.code === "P2002") {
+        return NextResponse.json(
+          { error: "Already enrolled in this course" },
+          { status: 409 }
+        );
+      }
       throw err;
     }
 

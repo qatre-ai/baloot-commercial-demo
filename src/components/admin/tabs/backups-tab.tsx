@@ -2,6 +2,7 @@
 import { authFetch } from "@/lib/auth/store";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -79,7 +80,7 @@ export function BackupsTab() {
     }
   }, [isRTL]);
 
-  useEffect(() => { fetchBackups(); }, [fetchBackups]);
+  useEffect(() => { deferEffect(fetchBackups); }, [fetchBackups]);
 
   // Auto-refresh every 60 seconds (silent — no loading spinner).
   useEffect(() => {

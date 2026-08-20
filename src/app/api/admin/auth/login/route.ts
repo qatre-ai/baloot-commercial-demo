@@ -11,24 +11,6 @@ export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
   const ua = getUserAgent(request);
 
-  // Rate limiting: 5 attempts per IP per 15 minutes (stricter for admin)
-  const rateLimit = checkRateLimit(`admin-login:${ip}`, 5, 15 * 60 * 1000);
-  if (!rateLimit.allowed) {
-    await db.intrusionAlert.create({
-      data: {
-        attemptType: "rate_limit",
-        ipAddress: ip,
-        userAgent: ua,
-        details: JSON.stringify({ reason: "Rate limit exceeded on admin login" }),
-      },
-    }).catch(() => {});
-
-    return NextResponse.json(
-      { error: "تعداد تلاش‌های ورود بیش از حد مجاز است. لطفاً بعداً تلاش کنید.", retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000) },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)) } }
-    );
-  }
-
   try {
     const body = await request.json();
     const { email, password, deviceFingerprint } = body;
@@ -41,6 +23,23 @@ export async function POST(request: NextRequest) {
     }
 
     const sanitizedEmail = email.trim().toLowerCase();
+
+    const rateLimit = checkRateLimit(`admin-login:${ip}:${sanitizedEmail}`, 5, 15 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      await db.intrusionAlert.create({
+        data: {
+          attemptType: "rate_limit",
+          ipAddress: ip,
+          userAgent: ua,
+          details: JSON.stringify({ reason: "Rate limit exceeded on admin login", email: sanitizedEmail }),
+        },
+      }).catch(() => {});
+
+      return NextResponse.json(
+        { error: "تعداد تلاش‌های ورود بیش از حد مجاز است. لطفاً بعداً تلاش کنید.", retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000) },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)) } }
+      );
+    }
 
     const admin = await db.admin.findUnique({
       where: { email: sanitizedEmail },

@@ -2,6 +2,7 @@
 import { authFetch } from "@/lib/auth/store";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -222,7 +223,7 @@ export function InstructorsTab({ isRTL }: { isRTL: boolean }) {
     finally { setIsLoading(false); }
   }, [isRTL]);
 
-  useEffect(() => { fetchInstructors(); }, [fetchInstructors]);
+  useEffect(() => { deferEffect(fetchInstructors); }, [fetchInstructors]);
 
   const handleCreateInstructor = async (data: Record<string, unknown>) => {
     setIsSaving(true);

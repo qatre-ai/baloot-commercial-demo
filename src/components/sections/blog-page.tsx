@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import Image from "next/image";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -847,7 +848,7 @@ export function BlogPage({
 
   // ---- Mount ----
   useEffect(() => {
-    setMounted(true);
+    deferEffect(() => setMounted(true));
   }, []);
 
   // ---- Debounce search ----
@@ -923,7 +924,7 @@ export function BlogPage({
 
   // Initial fetch & refetch when filters change
   useEffect(() => {
-    fetchPosts({ pageNum: 1, append: false });
+    deferEffect(() => fetchPosts({ pageNum: 1, append: false }));
   }, [activeCategory, debouncedSearch, sortOption]);
 
   // ---- Handlers ----
@@ -1011,7 +1012,7 @@ export function BlogPage({
       y: 0,
       transition: { duration: 0.25 },
     },
-  };
+  } as const;
 
   // For mobile: slide from bottom; desktop: slide from right
   const mobilePageVariants = {
@@ -1024,7 +1025,7 @@ export function BlogPage({
       y: "100%",
       transition: { duration: 0.25 },
     },
-  };
+  } as const;
 
   const desktopPageVariants = {
     hidden: { x: "100%" },
@@ -1036,7 +1037,7 @@ export function BlogPage({
       x: "100%",
       transition: { duration: 0.25 },
     },
-  };
+  } as const;
 
   return (
     <AnimatePresence>
@@ -1483,7 +1484,7 @@ function BlogPageContent({
               className="text-center py-20"
             >
               <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-muted/50 flex items-center justify-center">
-                {debouncedSearch ? (
+                {searchQuery ? (
                   <Search className="w-10 h-10 text-muted-foreground/40" />
                 ) : (
                   <BookOpen className="w-10 h-10 text-muted-foreground/40" />
@@ -1495,10 +1496,10 @@ function BlogPageContent({
                   isRTL && "font-[Vazirmatn]"
                 )}
               >
-                {debouncedSearch ? t.blog.no_results : t.blog.no_posts}
+                {searchQuery ? t.blog.no_results : t.blog.no_posts}
               </h3>
               <p className="text-muted-foreground text-sm max-w-sm mx-auto mb-6">
-                {debouncedSearch ? t.blog.try_different : ""}
+                {searchQuery ? t.blog.try_different : ""}
               </p>
               {hasActiveFilters && (
                 <Button

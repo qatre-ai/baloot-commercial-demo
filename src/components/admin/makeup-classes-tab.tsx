@@ -2,6 +2,7 @@
 import { authFetch } from "@/lib/auth/store";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { deferEffect } from "@/lib/react/defer-effect";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -244,8 +245,10 @@ export function MakeupClassesTab({ isRTL }: { isRTL: boolean }) {
   }, []);
 
   useEffect(() => {
-    fetchMakeupClasses();
-    fetchCourses();
+    deferEffect(() => {
+      fetchMakeupClasses();
+      fetchCourses();
+    });
   }, [fetchMakeupClasses, fetchCourses]);
 
   // Create/Update makeup class

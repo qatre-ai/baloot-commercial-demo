@@ -7,6 +7,7 @@ import {
   getUserAgent,
 } from "@/lib/auth/session";
 import { hashPassword } from "@/lib/auth/password";
+import { resolveInstrumentProfile } from "@/lib/validation/instruments";
 import { Prisma } from "@prisma/client";
 
 // GET /api/registration/pending/[id] - Get a single pending registration detail (admin only)
@@ -32,7 +33,17 @@ export async function GET(
     }
 
     // If approved, also fetch the created student
-    let createdStudent = null;
+    let createdStudent: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+      role: string;
+      isActive: boolean;
+      isVerified: boolean;
+      registrationStatus: string;
+      createdAt: Date;
+    } | null = null;
     if (registration.createdUserId) {
       createdStudent = await db.student.findUnique({
         where: { id: registration.createdUserId },
@@ -111,6 +122,11 @@ export async function PATCH(
       const result = await db.$transaction(async (tx) => {
         // Hash the nationalId as the default password
         const hashedPassword = await hashPassword(pendingReg.nationalId);
+        const instrumentProfile = resolveInstrumentProfile({
+          registrationInstrument: pendingReg.registrationInstrument,
+          primaryInstrument: pendingReg.primaryInstrument,
+          secondaryInstruments: pendingReg.secondaryInstruments,
+        });
 
         // Create the Student record from pending registration data
         const studentData: Record<string, unknown> = {
@@ -126,9 +142,9 @@ export async function PATCH(
           educationLevel: pendingReg.educationLevel,
           fieldOfStudy: pendingReg.fieldOfStudy,
           // Music profile
-          registrationInstrument: pendingReg.registrationInstrument,
-          primaryInstrument: pendingReg.primaryInstrument,
-          secondaryInstruments: pendingReg.secondaryInstruments,
+          registrationInstrument: instrumentProfile.registrationInstrument,
+          primaryInstrument: instrumentProfile.primaryInstrument,
+          secondaryInstruments: instrumentProfile.secondaryInstruments,
           musicExperienceYears: pendingReg.musicExperienceYears,
           previousTraining: pendingReg.previousTraining,
           musicGenres: pendingReg.musicGenres,

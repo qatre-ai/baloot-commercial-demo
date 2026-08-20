@@ -434,4 +434,6 @@ const fa = {
 } as const;
 
 export default fa;
-export type TranslationKeys = typeof fa;
+export type TranslationKeys<T = typeof fa> = {
+  [K in keyof T]: T[K] extends string ? string : TranslationKeys<T[K]>;
+};
